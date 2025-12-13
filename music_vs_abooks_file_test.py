@@ -22,11 +22,12 @@ def _print(*args):
 
 
 working_dir = '.'
+weights_dir = f'{working_dir}/weights_vector_label'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 100
+last_epoch = 200
 
 S = 24000
 N = 2
@@ -40,7 +41,7 @@ if USE_IPEX:
 rnd = random.Random()
 
 
-class FCNet(torch.nn.Module):
+class MAbNet(torch.nn.Module):
     def __init__(self, S=S,
                  conv1_channels=128, conv1_padding=12,
                  conv1_kernel=99, conv1_stride=11,
@@ -48,7 +49,7 @@ class FCNet(torch.nn.Module):
                  conv2_channels=128, conv2_kernel=19,
                  conv2_padding=15, conv2_stride=9,
                  pool2_kernel=128):
-        super(FCNet, self).__init__()
+        super(MAbNet, self).__init__()
 
         # self.conv1_channels = conv1_channels
         self.pool1_kernel = pool1_kernel
@@ -159,12 +160,21 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 
 print('preparing neural networking')
-fc_net = FCNet().to(device)
 
-if last_epoch >= 0:
-    fn_weights = f'{working_dir}/weights_2d_label/model_weights_epoch_{last_epoch}.pth'
-    fc_net.load_state_dict(torch.load(fn_weights, map_location=device))
-    fc_net.eval()
+mab_net = MAbNet()
+
+epoch = last_epoch
+
+if epoch >= 0:
+    fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
+    mab_net.load_state_dict(torch.load(fn_weights)) #, map_location=device))
+
+mab_net = mab_net.to(device)
+
+if USE_IPEX:
+    mab_net, optimizer = ipex.optimize(mab_net, dtype=torch.float32)
+
+mab_net.eval()
 
 print('preparing neural networking done')
 
@@ -204,7 +214,7 @@ def detect_file_type(fn_in_mp3):
     X = torch.FloatTensor(audio_data).to(device)
     X = X.divide(255.0).subtract(0.5)
 
-    test_preds = fc_net.forward(X)
+    test_preds = mab_net.forward(X)
     _print(test_preds)
     test_preds = test_preds.argmax(dim=1)
     _print(test_preds)
@@ -212,7 +222,7 @@ def detect_file_type(fn_in_mp3):
 
     print(f'(method 1) music: {100 - test_preds}%, audiobook: {test_preds}%')
 
-    pred = fc_net.inference(X)
+    pred = mab_net.inference(X)
     p0 = pred[:, 0]
     p1 = pred[:, 1]
     # print(p0.cpu().min(), p1.cpu().min(), (p1 - p0).cpu().min(), (p1 + p0).cpu().min())

@@ -21,11 +21,12 @@ from debug import _print
 working_dir = '.'
 
 weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
+# weights_dir = f'{working_dir}/{version_name}_3_300_24_weights'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 1500
+last_epoch = 1000
 
 S = 24000
 N = 3

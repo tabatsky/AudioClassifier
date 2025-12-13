@@ -2,3 +2,6 @@
 *.mp3
 *.raw
 *.pth
+*.zip
+*.bak
+__pycache__

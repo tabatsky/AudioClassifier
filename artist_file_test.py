@@ -14,14 +14,6 @@ from pydub import AudioSegment
 from artist_net import make_actual_nn, version_name
 from debug import _print
 
-
-
-def _print(*args):
-    # if True:
-    if False:
-        print(args)
-
-
 working_dir = '.'
 
 weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
@@ -29,7 +21,7 @@ weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 3200
+last_epoch = 200
 
 S = 24000
 N = 3
@@ -148,5 +140,5 @@ else:
     for item in result:
         print(item)
 
-    print(total_plus, total_minus)
+    print(total_plus, total_minus, total_plus + total_minus)
 

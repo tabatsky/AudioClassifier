@@ -35,7 +35,16 @@ the_batch_size = 100
 N = 2
 
 last_epoch = -1
-end_epoch = 100
+end_epoch = 200
+
+accum_coeff = 0.9
+
+if last_epoch == -1:
+    score_accumulator = 0.5
+    accuracy_accumulator_validate = 0.5
+else:
+    score_accumulator = 0.9334167838096619
+    accuracy_accumulator_validate = 0.9349722132006357
 
 USE_IPEX = True
 
@@ -129,6 +138,8 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 # torch.set_num_threads(1)
 
+score_accumulator = torch.FloatTensor([score_accumulator]).to(device)
+
 (H_train, W) = X_train.shape
 (H_validate, W) = X_validate.shape
 
@@ -155,7 +166,7 @@ print('making tensors done')
 # => Sc = 209 + 1 = 210
 
 
-class FCNet(torch.nn.Module):
+class MAbNet(torch.nn.Module):
     def __init__(self, S=S,
                  conv1_channels=128, conv1_padding=12,
                  conv1_kernel=99, conv1_stride=11,
@@ -163,7 +174,7 @@ class FCNet(torch.nn.Module):
                  conv2_channels=128, conv2_kernel=19,
                  conv2_padding=15, conv2_stride=9,
                  pool2_kernel=128):
-        super(FCNet, self).__init__()
+        super(MAbNet, self).__init__()
 
         # self.conv1_channels = conv1_channels
         self.pool1_kernel = pool1_kernel
@@ -253,34 +264,47 @@ class FCNet(torch.nn.Module):
 
 
 print('preparing neural networking')
-fc_net = FCNet().to(device)
+
+mab_net = MAbNet()
 
 epoch = last_epoch
 
 if epoch >= 0:
-    fn_weights = f'{working_dir}/weights/model_weights_epoch_{epoch}.pth'
-    fc_net.load_state_dict(torch.load(fn_weights, map_location=device))
-    fc_net.eval()
+    fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
+    mab_net.load_state_dict(torch.load(fn_weights)) #, map_location=device))
 
-optimizer = torch.optim.Adam(fc_net.parameters(), lr=lr)
+mab_net = mab_net.to(device)
+
+optimizer = torch.optim.Adam(mab_net.parameters(), lr=lr)
 
 if USE_IPEX:
-    fc_net, optimizer = ipex.optimize(fc_net, optimizer=optimizer, dtype=torch.float32)
+    mab_net, optimizer = ipex.optimize(mab_net, optimizer=optimizer, dtype=torch.float32)
 
 print('preparing neural networking done')
 
 # loss = torch.nn.CrossEntropyLoss()
 
-def loss(pred, target):
+
+def loss(pred, target, train_mode):
     count = float(list(target.shape)[0])
     p0 = pred[:, 0]
     p1 = pred[:, 1]
     # print(p0.cpu().min(), p1.cpu().min(), (p1 - p0).cpu().min(), (p1 + p0).cpu().min())
     y = (p1 - p0).multiply(ktan).tanh().multiply(0.5).add(0.5)
     # print(y.cpu().min(), y.cpu().max(), y.cpu().sum(), target.cpu().sum())
-    accuracy = ((1.0 - (y - target)) * (1.0 + (y - target))).pow(2).sum().divide(count)
+    score = ((1.0 - (y - target)) * (1.0 + (y - target))).pow(2).sum().divide(count)
     # print(accuracy.cpu())
-    return (1.0 - accuracy).log10()
+    if train_mode:
+        global score_accumulator
+        # print(score_accumulator.cpu())
+        score_accumulator = score_accumulator.multiply(accum_coeff).detach()
+        score_accumulator += (1 - accum_coeff) * score
+        # return (1.0 - score_accumulator + 1e-8).log10()
+        return (0.5 - score_accumulator).multiply(1.999).atanh().multiply(10000)
+    else:
+        # return (1.0 - score + 1e-8).log10()
+        return (0.5 - score).multiply(1.999).atanh().multiply(10000)
+
 
 epochs = []
 accuracies = []
@@ -291,8 +315,10 @@ print('starting training')
 while epoch < end_epoch:
     epoch += 1
     order = np.random.permutation(len(X_train))
+
+    mab_net.train()
+
     for start_index in range(0, len(X_train), the_batch_size):
-        # t00 = time.time()
 
         optimizer.zero_grad()
 
@@ -301,33 +327,37 @@ while epoch < end_epoch:
         x_batch = X_train[batch_indexes].to(device)
         y_batch = y_train[batch_indexes].to(device)
 
-        preds = fc_net.forward(x_batch)
+        preds = mab_net.forward(x_batch)
 
-        loss_value = loss(preds, y_batch)
+        loss_value = loss(preds, y_batch, True)
         _print(loss_value.cpu())
         loss_value.backward()
         optimizer.step()
 
-        # print(start_index, loss_value)
-        # t01 = time.time()
-        # print('batch time', t01 - t00)
+    mab_net.eval()
+    with torch.no_grad():
+        # if epoch % 5 == 0:
+        if True:
+            order = np.random.permutation(len(X_validate))
+            validate_batch_indexes = order[0:400]
+            x_validate_batch = X_validate[validate_batch_indexes].to(device)
+            y_validate_batch = y_validate[validate_batch_indexes].to(device)
+            test_preds = mab_net.inference(x_validate_batch).to(device)
+            loss_value = loss(test_preds, y_validate_batch, False).cpu().item()
+            test_preds = test_preds.argmax(dim=1).cpu()
+            _print(test_preds.cpu().sum())
+            _print(test_preds.cpu().float().mean())
+            accuracy = (test_preds.cpu() == y_validate_batch.cpu()).float().mean().item()
+            accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
+            print(epoch, accuracy_accumulator_validate, score_accumulator.item(), loss_value)
+            epochs.append(epoch)
+            accuracies.append(accuracy)
+            t1 = time.time()
+            print('time', t1 - t0)
+            with open(accuracy_log, "a") as f:
+                f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator.item()};{loss_value};{t1 - t0}\n')
+            t0 = t1
 
-    # if epoch % 5 == 0:
-    if True:
-        test_preds = fc_net.forward(X_validate)
-        test_preds = test_preds.argmax(dim=1)
-        _print(test_preds.cpu().sum())
-        _print(test_preds.cpu().float().mean())
-        accuracy = (test_preds.cpu() == y_validate.cpu()).float().mean().item()
-        print(epoch, accuracy, loss_value.cpu().item())
-        epochs.append(epoch)
-        accuracies.append(accuracy)
-        t1 = time.time()
-        print('time', t1 - t0)
-        with open(accuracy_log, "a") as f:
-            f.write(f'{epoch};{accuracy};{loss_value.cpu()};{t1-t0}\n')
-        t0 = t1
-
-    if epoch % 10 == 0:
-        fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
-        torch.save(fc_net.state_dict(), fn_weights)
+        if epoch % 10 == 0:
+            fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
+            torch.save(mab_net.state_dict(), fn_weights)

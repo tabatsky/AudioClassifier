@@ -5,7 +5,6 @@ import random
 import numpy as np
 import numpy.core.defchararray as np_f
 import csv
-import math
 
 import os
 
@@ -14,8 +13,11 @@ from debug import _print
 
 artist_count = 3
 
-samples_per_file = 600
+samples_per_file = 400
+# samples_per_file = 300
 
+# files_per_artist_train = 18
+# files_per_artist_validate = 6
 files_per_artist_train = 12
 files_per_artist_validate = 4
 # files_per_artist_train = 5
@@ -179,6 +181,7 @@ print('preparing neural networking done')
 # loss = torch.nn.CrossEntropyLoss()
 
 col_summator = torch.ones(artist_count, 1).to(device)
+score_pow_scale = np.log10(2) / np.log10(artist_count)
 
 
 def loss(pred, target, train_mode):
@@ -197,10 +200,11 @@ def loss(pred, target, train_mode):
         score_accumulator = score_accumulator.multiply(accum_coeff).detach()
         score_accumulator += (1 - accum_coeff) * score
         # return (1.0 - score_accumulator + 1e-8).log10()
-        return (0.5 - score_accumulator).multiply(1.999).atanh().multiply(10000)
+        return (0.5 - score_accumulator ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
     else:
         # return (1.0 - score + 1e-8).log10()
-        return (0.5 - score).multiply(1.999).atanh().multiply(10000)
+        return (0.5 - score ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
+
 
 epochs = []
 accuracies = []
@@ -236,16 +240,17 @@ while epoch < end_epoch:
         if True:
             order = np.random.permutation(len(X_validate))
             validate_batch_indexes = order[0:400]
-            x_validate_batch = X_train[validate_batch_indexes].to(device)
-            y_validate_batch = y_train[validate_batch_indexes].to(device)
+            x_validate_batch = X_validate[validate_batch_indexes].to(device)
+            y_validate_batch = y_validate[validate_batch_indexes].to(device)
             test_preds = artist_net.inference(x_validate_batch).to(device)
-            loss_value = loss(test_preds, y_validate_batch, False).cpu().item()
-            test_preds = test_preds.argmax(dim=1).cpu()
+            # loss_value = loss(test_preds, y_validate_batch, False).cpu().item()
+            loss_value = loss_value.cpu().item()
+            test_preds_numbers = test_preds.argmax(dim=1).cpu()
             y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
-            accuracy = (test_preds == y_validate_numbers).float().mean().item()
-            _print((test_preds == 0).sum())
-            _print((test_preds == 1).sum())
-            _print((test_preds == 2).sum())
+            accuracy = (test_preds_numbers == y_validate_numbers).float().mean().item()
+            _print((test_preds_numbers == 0).sum())
+            _print((test_preds_numbers == 1).sum())
+            _print((test_preds_numbers == 2).sum())
             accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
             print(epoch, accuracy_accumulator_validate, score_accumulator.item(), loss_value)
             epochs.append(epoch)

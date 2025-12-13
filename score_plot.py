@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from artist_net import version_name
 
-with open(f'{version_name}_3_600_16_accuracy.csv', 'r') as f:
+with open(f'{version_name}_3_300_24_accuracy.csv', 'r') as f:
     reader = csv.reader(f, delimiter=';')
     headers = next(reader)
     data = np.array(list(reader))
