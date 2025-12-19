@@ -44,9 +44,11 @@ accum_coeff = 0.9
 if last_epoch == -1:
     score_accumulator = 0.5
     accuracy_accumulator_validate = 0.5
+    loss_value_accumulator = 0.0
 else:
     score_accumulator = 0.9334167838096619
     accuracy_accumulator_validate = 0.9349722132006357
+    loss_value_accumulator = 0.0
 
 if USE_IPEX:
     import intel_extension_for_pytorch as ipex
@@ -138,7 +140,7 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 # torch.set_num_threads(1)
 
-score_accumulator = torch.FloatTensor([score_accumulator]).to(device)
+# score_accumulator = torch.FloatTensor([score_accumulator]).to(device)
 
 (H_train, W) = X_train.shape
 (H_validate, W) = X_validate.shape
@@ -298,13 +300,13 @@ def loss(pred, target, train_mode):
     if train_mode:
         global score_accumulator
         # print(score_accumulator.cpu())
-        score_accumulator = score_accumulator.multiply(accum_coeff).detach()
-        score_accumulator += (1 - accum_coeff) * score
+        score_accumulator *= accum_coeff
+        score_accumulator += (1 - accum_coeff) * score.item()
         # return (1.0 - score_accumulator + 1e-8).log10()
-        return (0.5 - score_accumulator).multiply(1.999).atanh().multiply(10000)
-    else:
-        # return (1.0 - score + 1e-8).log10()
-        return (0.5 - score).multiply(1.999).atanh().multiply(10000)
+        # return (0.5 - score_accumulator).multiply(1.999).atanh().multiply(10000)
+    # else:
+    # return (1.0 - score + 1e-8).log10()
+    return (0.5 - score).multiply(1.999).atanh().multiply(10000)
 
 
 epochs = []
@@ -331,6 +333,8 @@ while epoch < end_epoch:
         preds = mab_net.inference(x_batch)
 
         loss_value = loss(preds, y_batch, True)
+        loss_value_accumulator = loss_value_accumulator * accum_coeff + loss_value.item() * (1 - accum_coeff)
+
         _print(loss_value.cpu())
         loss_value.backward()
         optimizer.step()
@@ -351,13 +355,13 @@ while epoch < end_epoch:
             _print(test_preds.cpu().float().mean())
             accuracy = (test_preds.cpu() == y_validate_numbers.cpu()).float().mean().item()
             accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
-            print(epoch, accuracy_accumulator_validate, score_accumulator.item(), loss_value)
+            print(epoch, accuracy_accumulator_validate, score_accumulator, loss_value_accumulator)
             epochs.append(epoch)
             accuracies.append(accuracy)
             t1 = time.time()
             print('time', t1 - t0)
             with open(accuracy_log, "a") as f:
-                f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator.item()};{loss_value};{t1 - t0}\n')
+                f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator};{loss_value_accumulator};{t1 - t0}\n')
             t0 = t1
 
         if epoch % 10 == 0:

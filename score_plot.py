@@ -13,6 +13,10 @@ with open(f'{version_name}_3_300_24_accuracy.csv', 'r') as f:
     data = np_f.replace(data, '\'', '')
     data = data.astype(float)
 
+indices = np.where(data[:, 0] == 0)[0]
+last_index = indices[-1]
+data = data[last_index:, :]
+
 
 accum1 = 0.0
 accum2 = 0.0

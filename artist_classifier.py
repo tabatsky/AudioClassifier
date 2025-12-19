@@ -8,18 +8,22 @@ import csv
 
 import os
 
+import pandas as pd
+
+from sklearn.metrics import classification_report
+
 from artist_net import make_actual_nn, sample_len, version_name
 from debug import _print
 
 artist_count = 3
 
-samples_per_file = 400
-# samples_per_file = 300
+# samples_per_file = 400
+samples_per_file = 300
 
-# files_per_artist_train = 18
-# files_per_artist_validate = 6
-files_per_artist_train = 12
-files_per_artist_validate = 4
+files_per_artist_train = 18
+files_per_artist_validate = 6
+# files_per_artist_train = 12
+# files_per_artist_validate = 4
 # files_per_artist_train = 5
 # files_per_artist_validate = 2
 
@@ -42,19 +46,26 @@ accuracy_log = f'{working_dir}/{version_name}_{artist_count}_{samples_per_file}_
 lr = 1e-3
 the_batch_size = 100
 
-last_epoch = -1
-end_epoch = 1000
+last_epoch = 200
+end_epoch = 250
 
 accum_coeff = 0.9
 
 if last_epoch == -1:
     score_accumulator = 1.0 / artist_count
     accuracy_accumulator_validate = 1.0 / artist_count
+    loss_value_accumulator = 0.0
 else:
-    score_accumulator = 0.9334167838096619
-    accuracy_accumulator_validate = 0.9349722132006357
+    score_data = pd.read_csv(accuracy_log, delimiter=';').to_numpy().astype(float)
+    epoch_data = score_data[:, 0]
+    score_data = score_data[np.where(epoch_data == last_epoch)]
+    # print(score_data[-1, :])
+    score_accumulator = score_data[-1, 2]
+    accuracy_accumulator_validate = score_data[-1, 1]
+    loss_value_accumulator = score_data[-1, 3]
 
 USE_IPEX = True
+# USE_IPEX = False
 
 if USE_IPEX:
     import intel_extension_for_pytorch as ipex
@@ -76,9 +87,9 @@ torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
-# torch.set_num_threads(1)
+torch.set_num_threads(6)
 
-score_accumulator = torch.FloatTensor([score_accumulator]).to(device)
+# score_accumulator = torch.FloatTensor([score_accumulator]).to(device)
 
 print('loading data')
 
@@ -176,34 +187,58 @@ optimizer = torch.optim.Adam(artist_net.parameters(), lr=lr)
 if USE_IPEX:
     artist_net, optimizer = ipex.optimize(artist_net, optimizer=optimizer, dtype=torch.float32)
 
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#     optimizer,
+#     mode='max',
+#     factor=0.9,
+#     patience=10,
+#     min_lr=1e-6
+# )
+
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.995)
+for i in range(last_epoch):
+    scheduler.step()
+
 print('preparing neural networking done')
 
 # loss = torch.nn.CrossEntropyLoss()
 
+loss = torch.nn.CrossEntropyLoss()
+
 col_summator = torch.ones(artist_count, 1).to(device)
 score_pow_scale = np.log10(2) / np.log10(artist_count)
+sm = torch.nn.Softmax()
 
 
-def loss(pred, target, train_mode):
-    _print(pred.shape)
-    _print(target.shape)
-    # print(pred.shape, pred.min(), pred.max())
-    # print(target)
+def calc_score(pred, target):
     count = float(list(target.shape)[0])
-    score = (pred * target) @ col_summator
-    # print(score.shape, score.min(), score.max())
+    score = (sm(pred) * target) @ col_summator
     score = score.sum().divide(count)
-    # print(score)
-    if train_mode:
-        global score_accumulator
-        # print(score_accumulator.cpu())
-        score_accumulator = score_accumulator.multiply(accum_coeff).detach()
-        score_accumulator += (1 - accum_coeff) * score
-        # return (1.0 - score_accumulator + 1e-8).log10()
-        return (0.5 - score_accumulator ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
-    else:
-        # return (1.0 - score + 1e-8).log10()
-        return (0.5 - score ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
+    global score_accumulator
+    score_accumulator *= accum_coeff
+    score_accumulator += (1 - accum_coeff) * score.item()
+
+
+# def loss(pred, target, train_mode):
+#     _print(pred.shape)
+#     _print(target.shape)
+#     # print(pred.shape, pred.min(), pred.max())
+#     # print(target)
+#     count = float(list(target.shape)[0])
+#     score = (pred * target) @ col_summator
+#     # print(score.shape, score.min(), score.max())
+#     score = score.sum().divide(count)
+#     # print(score)
+#     if train_mode:
+#         global score_accumulator
+#         # print(score_accumulator.cpu())
+#         score_accumulator *= accum_coeff
+#         score_accumulator += (1 - accum_coeff) * score.item()
+#         # return (1.0 - score_accumulator + 1e-8).log10()
+#         # return (0.5 - score_accumulator ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
+#     # else:
+#     # return (1.0 - score + 1e-8).log10()
+#     return (0.5 - score ** score_pow_scale).multiply(1.999).atanh().multiply(10000)
 
 
 epochs = []
@@ -226,13 +261,19 @@ while epoch < end_epoch:
         X_batch = X_train[batch_indexes].to(device)
         y_batch = y_train[batch_indexes].to(device)
 
-        y_pred = artist_net.inference(X_batch)
+        # y_pred = artist_net.inference(X_batch)
+        y_pred = artist_net.forward(X_batch)
 
-        loss_value = loss(y_pred, y_batch, True)
+        # loss_value = loss(y_pred, y_batch, True)
+        loss_value = loss(y_pred, y_batch)
+        calc_score(y_pred, y_batch)
+        loss_value_accumulator = loss_value_accumulator * accum_coeff + loss_value.item() * (1 - accum_coeff)
 
         _print(loss_value.cpu())
         loss_value.backward()
         optimizer.step()
+
+    scheduler.step()
 
     artist_net.eval()
     with torch.no_grad():
@@ -242,7 +283,8 @@ while epoch < end_epoch:
             validate_batch_indexes = order[0:400]
             x_validate_batch = X_validate[validate_batch_indexes].to(device)
             y_validate_batch = y_validate[validate_batch_indexes].to(device)
-            test_preds = artist_net.inference(x_validate_batch).to(device)
+            # test_preds = artist_net.inference(x_validate_batch).to(device)
+            test_preds = artist_net.forward(x_validate_batch).to(device)
             # loss_value = loss(test_preds, y_validate_batch, False).cpu().item()
             loss_value = loss_value.cpu().item()
             test_preds_numbers = test_preds.argmax(dim=1).cpu()
@@ -252,15 +294,25 @@ while epoch < end_epoch:
             _print((test_preds_numbers == 1).sum())
             _print((test_preds_numbers == 2).sum())
             accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
-            print(epoch, accuracy_accumulator_validate, score_accumulator.item(), loss_value)
+            print(epoch, accuracy_accumulator_validate, score_accumulator, loss_value_accumulator, scheduler.get_last_lr())
             epochs.append(epoch)
             accuracies.append(accuracy)
             t1 = time.time()
             print('time', t1 - t0)
             with open(accuracy_log, "a") as f:
-                f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator.item()};{loss_value};{t1 - t0}\n')
+                f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator};{loss_value_accumulator};{t1 - t0}\n')
             t0 = t1
 
         if epoch % 10 == 0:
             fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
             torch.save(artist_net.state_dict(), fn_weights)
+
+order = np.random.permutation(len(X_validate))
+validate_batch_indexes = order[0:1000]
+x_validate_batch = X_validate[validate_batch_indexes].to(device)
+y_validate_batch = y_validate[validate_batch_indexes].to(device)
+test_preds = artist_net.forward(x_validate_batch).to(device)
+test_preds_numbers = test_preds.argmax(dim=1).cpu()
+y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
+
+print(classification_report(y_validate_numbers, test_preds_numbers))
