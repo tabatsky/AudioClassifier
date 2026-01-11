@@ -22,7 +22,8 @@ def _print(*args):
 
 
 working_dir = '.'
-weights_dir = f'{working_dir}/weights_vector_label'
+weights_dir = f'{working_dir}/weights/weights_vector_label'
+tracks_dir = f'{working_dir}/audio_data_tracks'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
@@ -234,16 +235,17 @@ def detect_file_type(fn_in_mp3):
     # print(p0.cpu().min(), p1.cpu().min(), (p1 - p0).cpu().min(), (p1 + p0).cpu().min())
     print(f'(method 3) music: {p0}%, audiobook: {p1}%')
 
+
 if len(sys.argv) > 1:
     the_fn_in_mp3 = sys.argv[1]
     print(the_fn_in_mp3)
     detect_file_type(the_fn_in_mp3)
 else:
-    music_filenames = os.listdir('music_test')
+    music_filenames = os.listdir('audio_data_tracks/music_test')
     for filename in music_filenames:
-        the_fn_in_mp3 = f'music_test/{filename}'
+        the_fn_in_mp3 = f'{tracks_dir}/music_test/{filename}'
         detect_file_type(the_fn_in_mp3)
-    abooks_filenames = os.listdir('abooks_test')
+    abooks_filenames = os.listdir('audio_data_tracks/abooks_test')
     for filename in abooks_filenames:
-        the_fn_in_mp3 = f'abooks_test/{filename}'
+        the_fn_in_mp3 = f'{tracks_dir}/abooks_test/{filename}'
         detect_file_type(the_fn_in_mp3)

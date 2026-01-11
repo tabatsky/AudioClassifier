@@ -2,6 +2,8 @@ import sys
 import os
 import time
 
+import glob
+
 import torch
 import random
 import numpy as np
@@ -9,33 +11,43 @@ import numpy.core.defchararray as np_f
 import csv
 import math
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+
 from pydub import AudioSegment
 
-from artist_net import make_actual_nn, version_name
+from scipy import signal
+
+from artist_net import ArtistNetSpectrogram
 from debug import _print
+
+version_name = 'spectrogram'
 
 working_dir = '.'
 
+# weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
 weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
-tracks_dir = f'{working_dir}/audio_data_tracks'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 200
+last_epoch = 260
 
 S = 24000
 N = 3
 L = 500
 
+sample_rate = 8000
+
 ktan = 0.03
-USE_IPEX = True
+USE_IPEX = False
 
 if USE_IPEX:
     import intel_extension_for_pytorch as ipex
 
 rnd = random.Random()
-
 
 print('cuda available:', torch.cuda.is_available())
 print('xpu available:', torch.xpu.is_available())
@@ -56,17 +68,18 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 
 print('preparing neural networking')
-artist_net = make_actual_nn()
+artist_net = ArtistNetSpectrogram()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
-    artist_net.load_state_dict(torch.load(fn_weights, map_location=device))
+    artist_net.load_state_dict(torch.load(fn_weights))
     artist_net.eval()
 
 artist_net = artist_net.to(device)
 
 if USE_IPEX:
     artist_net = ipex.optimize(artist_net, dtype=torch.float32)
+
 
 print('preparing neural networking done')
 
@@ -103,8 +116,16 @@ def detect_file_type(fn_in_mp3):
     _print(audio_data)
     _print(audio_data.shape)
 
-    X = torch.FloatTensor(audio_data).to(device)
-    X = X.divide(255.0).subtract(0.5)
+    audio_data_spectrograms = []
+    for i in range(L):
+        sample = audio_data[i, :]
+        frequencies, times, spectrogram = signal.spectrogram(sample, sample_rate)
+        audio_data_spectrograms.append(spectrogram)
+    audio_data_spectrograms = np.array(audio_data_spectrograms)
+    print(audio_data_spectrograms.shape)
+
+    X = torch.FloatTensor(audio_data_spectrograms).to(device)
+    # X = X.divide(255.0).subtract(0.5)
 
     pred = artist_net.inference(X)
     pp = []
@@ -116,30 +137,50 @@ def detect_file_type(fn_in_mp3):
 
     return [np.argmax(pp), np.max(pp)]
 
+def do_it(folder, artist):
+    result = np.array([0] * 3)
+    # total_plus = 0
+    # total_minus = 0
+    fn_in_list = glob.glob(f'{folder}\\*.mp3') + glob.glob(f'{folder}\\*\\*.mp3')
+    for i in range(len(fn_in_list)):
+        the_fn_in_mp3 = fn_in_list[i]
+        print(i, the_fn_in_mp3)
+        pred = detect_file_type(the_fn_in_mp3)
+        # result.append([i, artist, pred, the_fn_in_mp3])
+        # if pred[0] == artist:
+        #     total_plus += 1
+        # else:
+        #     total_minus += 1
+        result[pred[0]] += 1
+    # for item in result:
+    #     print(item)
+    # print(total_plus, total_minus, total_plus + total_minus)
+    # return [total_plus, total_minus, total_plus + total_minus]
+    return result
+
 
 if len(sys.argv) > 1:
-    the_fn_in_mp3 = sys.argv[1]
-    print(the_fn_in_mp3)
-    detect_file_type(the_fn_in_mp3)
+    folder = sys.argv[1]
+    artist = int(sys.argv[2])
 else:
+    folders = [
+        "N:\\Немного Нервно MP3",
+        "N:\\music\\MP3\\The Cranberries",
+        "N:\\music\\MP3\\Любэ"
+    ]
     result = []
-    total_plus = 0
-    total_minus = 0
-
-    for artist in range(N):
-        filenames = os.listdir(f'{tracks_dir}/artist{artist+1}_train')
-        # for i in range(12, len(filenames)):
-        for i in range(len(filenames)):
-            the_fn_in_mp3 = f'{tracks_dir}/artist{artist+1}_train/{filenames[i]}'
-            pred = detect_file_type(the_fn_in_mp3)
-            result.append([i, artist, pred, filenames[i]])
-            if pred[0] == artist:
-                total_plus += 1
-            else:
-                total_minus += 1
-
-    for item in result:
-        print(item)
-
-    print(total_plus, total_minus, total_plus + total_minus)
+    for artist in range(3):
+        result.append(do_it(folders[artist], artist))
+    result = np.array(result)
+    print(result)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(result, annot=True, fmt='d', cmap='Blues',
+                xticklabels=['0', '1', '2'],
+                yticklabels=['0', '1', '2'])
+    plt.title('Confusion Matrix')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.savefig("confusion_matrix_folder_test_spectrogram.png", dpi=150)
+    plt.close()
 

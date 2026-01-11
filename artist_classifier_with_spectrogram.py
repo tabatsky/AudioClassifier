@@ -12,8 +12,12 @@ import pandas as pd
 
 from sklearn.metrics import classification_report
 
-from artist_net import make_actual_nn, sample_len, version_name
+from scipy import signal
+
+from artist_net import ArtistNetSpectrogram, sample_len
 from debug import _print
+
+version_name = 'spectrogram'
 
 artist_count = 3
 
@@ -47,6 +51,8 @@ accuracy_log = f'{working_dir}/accuracy/{version_name}_{artist_count}_{samples_p
 
 lr = 1e-3
 the_batch_size = 100
+
+sample_rate = 8000
 
 last_epoch = -1
 end_epoch = 300
@@ -110,6 +116,14 @@ artist_data_train = np.reshape(artist_data_train, (count_train, sample_len))
 _print(artist_data_train)
 _print(artist_data_train.shape)
 
+artist_data_train_spectrograms = []
+for i in range(count_train):
+    sample = artist_data_train[i, :]
+    frequencies, times, spectrogram = signal.spectrogram(sample, sample_rate)
+    artist_data_train_spectrograms.append(spectrogram)
+artist_data_train_spectrograms = np.array(artist_data_train_spectrograms)
+print(artist_data_train_spectrograms.shape)
+
 with open(f'{audio_data_raw_dir}/artist_{artist_count}_{samples_per_file}_{files_per_artist_total}_validate.raw', "rb") as file:
     raw_artist_data_validate = file.read()
 
@@ -120,6 +134,14 @@ _print(np.min(artist_data_validate), np.max(artist_data_validate), np.mean(artis
 artist_data_validate = np.reshape(artist_data_validate, (count_validate, sample_len))
 _print(artist_data_validate)
 _print(artist_data_validate.shape)
+
+artist_data_validate_spectrograms = []
+for i in range(count_validate):
+    sample = artist_data_validate[i, :]
+    frequencies, times, spectrogram = signal.spectrogram(sample, sample_rate)
+    artist_data_validate_spectrograms.append(spectrogram)
+artist_data_validate_spectrograms = np.array(artist_data_validate_spectrograms)
+print(artist_data_validate_spectrograms.shape)
 
 artist_labels_train = []
 artist_labels_validate = []
@@ -143,17 +165,17 @@ print('making train and test')
 
 _print(np.mean(artist_data_train), np.mean(artist_labels_train))
 
-X_train = artist_data_train
+X_train = artist_data_train_spectrograms
 y_train = artist_labels_train
-X_validate = artist_data_validate
+X_validate = artist_data_validate_spectrograms
 y_validate = artist_labels_validate
 
 print('making train and test done')
 
-(H_train, W) = X_train.shape
-(H_validate, W) = X_validate.shape
+(N_train, W, H) = X_train.shape
+(N_validate, W, H) = X_validate.shape
 
-print(W, H_train, H_validate)
+print(W, H, N_train, N_validate)
 
 print('making tensors')
 
@@ -163,9 +185,9 @@ y_train = torch.FloatTensor(y_train).to(device)
 y_validate = torch.FloatTensor(y_validate).to(device)
 _print('ok here')
 
-X_train = X_train.divide(255.0).subtract(0.5)
-X_validate = X_validate.divide(255.0).subtract(0.5)
-_print('ok here')
+# X_train = X_train.divide(255.0).subtract(0.5)
+# X_validate = X_validate.divide(255.0).subtract(0.5)
+# _print('ok here')
 
 print(X_train.cpu().min(), X_train.cpu().max(), X_train.cpu().mean())
 print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
@@ -173,7 +195,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = make_actual_nn()
+artist_net = ArtistNetSpectrogram()
 
 epoch = last_epoch
 

@@ -4,6 +4,9 @@ import random
 
 from pydub import AudioSegment
 
+tracks_dir = f'{working_dir}/audio_data_tracks'
+audio_data_raw_dir = f'{working_dir}/audio_data_raw'
+
 FRAME_RATES = [8000]
 # FRAME_RATES = [8000, 16000, 32000]
 SAMPLE_LENGTH = 24000
@@ -34,11 +37,11 @@ artist = 0
 while artist < artist_count:
     artist += 1
 
-    artist_filenames = os.listdir(f'artist{artist}_train')
+    artist_filenames = os.listdir(f'{tracks_dir}/artist{artist}_train')
     print(len(artist_filenames), artist_filenames)
 
     for n in range(files_per_artist_train):
-        fn_in = f'artist{artist}_train/{artist_filenames[n]}'
+        fn_in = f'{tracks_dir}/artist{artist}_train/{artist_filenames[n]}'
         sound = AudioSegment.from_mp3(fn_in)
 
         for frame_rate in FRAME_RATES:
@@ -63,7 +66,7 @@ while artist < artist_count:
 
     for k in range(files_per_artist_validate):
         n = k + files_per_artist_train
-        fn_in = f'artist{artist}_train/{artist_filenames[n]}'
+        fn_in = f'{tracks_dir}/artist{artist}_train/{artist_filenames[n]}'
         sound = AudioSegment.from_mp3(fn_in)
 
         for frame_rate in FRAME_RATES:
@@ -91,7 +94,7 @@ artist_raw_sound_train = AudioSegment(artist_raw_data_train, frame_rate=FRAME_RA
 # artist_raw_sound_train.export('artist_train.pcm', format='u8')
 # artist_raw_sound_train.export('artist_train.mp3', format='mp3')
 
-with open(f'artist_{artist_count}_{samples_per_file}_{files_per_artist_total}_train.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/artist_{artist_count}_{samples_per_file}_{files_per_artist_total}_train.raw', 'wb') as f:
     f.write(artist_raw_data_train)
 
 artist_raw_sound_validate = AudioSegment(artist_raw_data_validate, frame_rate=FRAME_RATES[0], sample_width=1, channels=1)
@@ -99,6 +102,6 @@ artist_raw_sound_validate = AudioSegment(artist_raw_data_validate, frame_rate=FR
 # artist_raw_sound_validate.export('artist_validate.pcm', format='u8')
 # artist_raw_sound_validate.export('artist_validate.mp3', format='mp3')
 
-with open(f'artist_{artist_count}_{samples_per_file}_{files_per_artist_total}_validate.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/artist_{artist_count}_{samples_per_file}_{files_per_artist_total}_validate.raw', 'wb') as f:
     f.write(artist_raw_data_validate)
 

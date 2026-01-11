@@ -4,6 +4,9 @@ import random
 
 from pydub import AudioSegment
 
+tracks_dir = f'{working_dir}/audio_data_tracks'
+audio_data_raw_dir = f'{working_dir}/audio_data_raw'
+
 FRAME_RATE = 8000
 SAMPLE_LENGTH = 24000
 
@@ -17,14 +20,14 @@ samples_per_file_validate = count_per_type_validate // files_per_type
 
 rnd = random.Random()
 
-music_filenames = os.listdir('music_train')
+music_filenames = os.listdir(f'{tracks_dir}/music_train')
 print(len(music_filenames), music_filenames)
 
 music_raw_data_train = bytes(0)
 music_raw_data_validate = bytes(0)
 
 for n in range(files_per_type):
-    fn_in = f'music_train/{music_filenames[n]}'
+    fn_in = f'{tracks_dir}/music_train/{music_filenames[n]}'
     sound = AudioSegment.from_mp3(fn_in)
 
     print(n, fn_in, sound.frame_rate, sound.sample_width, sound.channels)
@@ -59,27 +62,27 @@ for n in range(files_per_type):
 music_raw_sound_train = AudioSegment(music_raw_data_train, frame_rate=FRAME_RATE, sample_width=1, channels=1)
 
 # music_raw_sound_train.export('music_train.pcm', format='u8')
-music_raw_sound_train.export('music_train.mp3', format='mp3')
+# music_raw_sound_train.export('music_train.mp3', format='mp3')
 
-with open('music_train.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/music_train.raw', 'wb') as f:
     f.write(music_raw_data_train)
 
 music_raw_sound_validate = AudioSegment(music_raw_data_validate, frame_rate=FRAME_RATE, sample_width=1, channels=1)
 
 # music_raw_sound_validate.export('music_validate.pcm', format='u8')
-music_raw_sound_validate.export('music_validate.mp3', format='mp3')
+# music_raw_sound_validate.export('music_validate.mp3', format='mp3')
 
-with open('music_validate.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/music_validate.raw', 'wb') as f:
     f.write(music_raw_data_validate)
 
-abooks_filenames = os.listdir('abooks_train')
+abooks_filenames = os.listdir(f'{tracks_dir}/abooks_train')
 print(len(abooks_filenames), abooks_filenames)
 
 abooks_raw_data_train = bytes(0)
 abooks_raw_data_validate = bytes(0)
 
 for n in range(files_per_type):
-    fn_in = f'abooks_train/{abooks_filenames[n]}'
+    fn_in = f'{tracks_dir}/abooks_train/{abooks_filenames[n]}'
     sound = AudioSegment.from_mp3(fn_in)
 
     print(n, fn_in, sound.frame_rate, sound.sample_width, sound.channels)
@@ -114,15 +117,15 @@ for n in range(files_per_type):
 abooks_raw_sound_train = AudioSegment(abooks_raw_data_train, frame_rate=FRAME_RATE, sample_width=1, channels=1)
 
 # abooks_raw_sound_train.export('abooks_train.pcm', format='u8')
-abooks_raw_sound_train.export('abooks_train.mp3', format='mp3')
+# abooks_raw_sound_train.export('abooks_train.mp3', format='mp3')
 
-with open('abooks_train.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/abooks_train.raw', 'wb') as f:
     f.write(abooks_raw_data_train)
 
 abooks_raw_sound_validate = AudioSegment(abooks_raw_data_validate, frame_rate=FRAME_RATE, sample_width=1, channels=1)
 
 # abooks_raw_sound_validate.export('abooks_validate.pcm', format='u8')
-abooks_raw_sound_validate.export('abooks_validate.mp3', format='mp3')
+# abooks_raw_sound_validate.export('abooks_validate.mp3', format='mp3')
 
-with open('abooks_validate.raw', 'wb') as f:
+with open(f'{audio_data_raw_dir}/abooks_validate.raw', 'wb') as f:
     f.write(abooks_raw_data_validate)

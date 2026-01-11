@@ -22,10 +22,12 @@ count_per_type_validate = 500
 working_dir = '.'
 os.makedirs(working_dir, exist_ok=True)
 
-weights_dir = f'{working_dir}/weights_numeric_label'
+weights_dir = f'{working_dir}/weights/weights_numeric_label'
 os.makedirs(weights_dir, exist_ok=True)
 
-accuracy_log = f'{working_dir}/accuracy_numeric_label.csv'
+audio_data_raw_dir = f'{working_dir}/audio_data_raw'
+
+accuracy_log = f'{working_dir}/accuracy/accuracy_numeric_label.csv'
 
 lr = 1e-4
 ktan = 0.03
@@ -58,7 +60,7 @@ print('loading data')
 # arr_1d = np.array(range(count_per_type_validate * S))
 # print(np.reshape(arr_1d, (count_per_type_validate, S)))
 
-with open(f'{working_dir}/music_train.raw', "rb") as file:
+with open(f'{audio_data_raw_dir}/music_train.raw', "rb") as file:
     raw_music_data_train = file.read()
 
 _print(len(raw_music_data_train))
@@ -71,7 +73,7 @@ _print(music_data_train)
 _print(music_data_train.shape)
 music_labels_train = np.array([0.0] * count_per_type_train)
 
-with open(f'{working_dir}/music_validate.raw', "rb") as file:
+with open(f'{audio_data_raw_dir}/music_validate.raw', "rb") as file:
     raw_music_data_validate = file.read()
 
 _print(len(raw_music_data_validate))
@@ -83,7 +85,7 @@ _print(music_data_validate)
 _print(music_data_validate.shape)
 music_labels_validate = np.array([0.0] * count_per_type_validate)
 
-with open(f'{working_dir}/abooks_train.raw', "rb") as file:
+with open(f'{audio_data_raw_dir}/abooks_train.raw', "rb") as file:
     raw_abooks_data_train = file.read()
 
 _print(len(raw_abooks_data_train))
@@ -95,7 +97,7 @@ _print(abooks_data_train)
 _print(abooks_data_train.shape)
 abooks_labels_train = np.array([1.0] * count_per_type_train)
 
-with open(f'{working_dir}/abooks_validate.raw', "rb") as file:
+with open(f'{audio_data_raw_dir}/abooks_validate.raw', "rb") as file:
     raw_abooks_data_validate = file.read()
 
 _print(len(raw_abooks_data_validate))

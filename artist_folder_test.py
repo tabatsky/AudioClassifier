@@ -11,6 +11,9 @@ import numpy.core.defchararray as np_f
 import csv
 import math
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 from sklearn.model_selection import train_test_split
 
 from pydub import AudioSegment
@@ -21,12 +24,12 @@ from debug import _print
 working_dir = '.'
 
 # weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
-weights_dir = f'{working_dir}/{version_name}_3_300_24_weights'
+weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 250
+last_epoch = 70
 
 S = 24000
 N = 3
@@ -121,23 +124,25 @@ def detect_file_type(fn_in_mp3):
     return [np.argmax(pp), np.max(pp)]
 
 def do_it(folder, artist):
-    result = []
-    total_plus = 0
-    total_minus = 0
+    result = np.array([0] * 3)
+    # total_plus = 0
+    # total_minus = 0
     fn_in_list = glob.glob(f'{folder}\\*.mp3') + glob.glob(f'{folder}\\*\\*.mp3')
     for i in range(len(fn_in_list)):
         the_fn_in_mp3 = fn_in_list[i]
         print(i, the_fn_in_mp3)
         pred = detect_file_type(the_fn_in_mp3)
-        result.append([i, artist, pred, the_fn_in_mp3])
-        if pred[0] == artist:
-            total_plus += 1
-        else:
-            total_minus += 1
-    for item in result:
-        print(item)
-    print(total_plus, total_minus, total_plus + total_minus)
-    return [total_plus, total_minus, total_plus + total_minus]
+        # result.append([i, artist, pred, the_fn_in_mp3])
+        # if pred[0] == artist:
+        #     total_plus += 1
+        # else:
+        #     total_minus += 1
+        result[pred[0]] += 1
+    # for item in result:
+    #     print(item)
+    # print(total_plus, total_minus, total_plus + total_minus)
+    # return [total_plus, total_minus, total_plus + total_minus]
+    return result
 
 
 if len(sys.argv) > 1:
@@ -145,12 +150,23 @@ if len(sys.argv) > 1:
     artist = int(sys.argv[2])
 else:
     folders = [
-        "N:\\music\\MP3\\Немного Нервно",
+        "N:\\Немного Нервно MP3",
         "N:\\music\\MP3\\The Cranberries",
         "N:\\music\\MP3\\Любэ"
     ]
     result = []
     for artist in range(3):
         result.append(do_it(folders[artist], artist))
+    result = np.array(result)
     print(result)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(result, annot=True, fmt='d', cmap='Blues',
+                xticklabels=['0', '1', '2'],
+                yticklabels=['0', '1', '2'])
+    plt.title('Confusion Matrix')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.savefig("confusion_matrix_folder_test.png", dpi=150)
+    plt.close()
 
