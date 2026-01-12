@@ -440,162 +440,6 @@ def test_model(model, processor, test_df, class_mapping, batch_size=8):
     
     return accuracy, all_predictions, all_probabilities
 
-# ============================================================================
-# 5. ИНФЕРЕНС НА НОВЫХ ДАННЫХ
-# ============================================================================
-
-# class AudioClassifier:
-#     """Класс для классификации новых аудиофайлов"""
-#
-#     def __init__(self, model_path="wav2vec2_finetuned"):
-#         """
-#         Инициализация классификатора
-#
-#         Args:
-#             model_path: путь к обученной модели
-#         """
-#         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#
-#         print(f"Загрузка модели из {model_path}...")
-#         try:
-#             # Загружаем процессор и модель
-#             self.processor = Wav2Vec2Processor.from_pretrained(model_path)
-#             self.model = Wav2Vec2ForSequenceClassification.from_pretrained(model_path)
-#             self.model.to(self.device)
-#             self.model.eval()
-#         except Exception as e:
-#             print(f"Ошибка загрузки модели: {e}")
-#             raise
-#
-#         # Загружаем маппинг классов
-#         try:
-#             with open(os.path.join(model_path, "class_mapping.json"), "r") as f:
-#                 self.class_mapping = json.load(f)
-#             self.idx_to_class = {v: k for k, v in self.class_mapping.items()}
-#         except:
-#             print("⚠️ Файл class_mapping.json не найден, использую числовые метки")
-#             self.class_mapping = {}
-#             self.idx_to_class = {}
-#
-#         print(f"✅ Модель загружена на {self.device}")
-#         print(f"Количество классов: {len(self.class_mapping)}")
-    
-    # def preprocess_audio(self, audio_path, max_duration=5.0):
-    #     """Предобработка аудиофайла"""
-    #     try:
-    #         # Загрузка аудио
-    #         waveform, sample_rate = torchaudio.load(audio_path)
-    #
-    #         # Ресемплинг
-    #         if sample_rate != 16000:
-    #             resampler = torchaudio.transforms.Resample(sample_rate, 16000)
-    #             waveform = resampler(waveform)
-    #
-    #         # В моно
-    #         if waveform.shape[0] > 1:
-    #             waveform = torch.mean(waveform, dim=0, keepdim=True)
-    #
-    #         # Обрезка/паддинг
-    #         max_length = int(16000 * max_duration)
-    #         if waveform.shape[1] > max_length:
-    #             waveform = waveform[:, :max_length]
-    #         elif waveform.shape[1] < max_length:
-    #             padding = max_length - waveform.shape[1]
-    #             waveform = torch.nn.functional.pad(waveform, (0, padding))
-    #
-    #         # Нормализация
-    #         if torch.max(torch.abs(waveform)) > 0:
-    #             waveform = waveform / torch.max(torch.abs(waveform))
-    #
-    #         return waveform.squeeze().numpy(), 16000
-    #
-    #     except Exception as e:
-    #         print(f"Ошибка предобработки файла {audio_path}: {e}")
-    #         return None, None
-    #
-    # def predict(self, audio_path, return_probs=False):
-    #     """
-    #     Предсказание для одного аудиофайла
-    #
-    #     Args:
-    #         audio_path: путь к аудиофайлу
-    #         return_probs: возвращать ли вероятности
-    #
-    #     Returns:
-    #         predicted_class, confidence или (predicted_class, confidence, probabilities)
-    #     """
-    #     # Предобработка
-    #     audio_array, sr = self.preprocess_audio(audio_path)
-    #     if audio_array is None:
-    #         return None
-    #
-    #     # Обработка через процессор
-    #     inputs = self.processor(
-    #         audio_array,
-    #         sampling_rate=sr,
-    #         return_tensors="pt",
-    #         padding="max_length",
-    #         max_length=16000 * 5,
-    #         truncation=True
-    #     )
-    #
-    #     # Инференс
-    #     with torch.no_grad():
-    #         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-    #         outputs = self.model(**inputs)
-    #         logits = outputs.logits
-    #         probabilities = torch.softmax(logits, dim=1)
-    #
-    #         predicted_idx = torch.argmax(probabilities).item()
-    #         confidence = probabilities[0][predicted_idx].item()
-    #
-    #         # Получаем имя класса
-    #         class_name = self.idx_to_class.get(predicted_idx, f"Class_{predicted_idx}")
-    #
-    #     if return_probs:
-    #         return class_name, confidence, probabilities.cpu().numpy()[0]
-    #     else:
-    #         return class_name, confidence
-    #
-    # def predict_batch(self, audio_paths, batch_size=8):
-    #     """
-    #     Пакетное предсказание
-    #
-    #     Args:
-    #         audio_paths: список путей к аудиофайлам
-    #         batch_size: размер батча
-    #
-    #     Returns:
-    #         список словарей с результатами
-    #     """
-    #     results = []
-    #
-    #     for i in range(0, len(audio_paths), batch_size):
-    #         batch_paths = audio_paths[i:i+batch_size]
-    #         batch_results = []
-    #
-    #         for audio_path in batch_paths:
-    #             try:
-    #                 class_name, confidence = self.predict(audio_path)
-    #                 batch_results.append({
-    #                     'file': audio_path,
-    #                     'predicted_class': class_name,
-    #                     'confidence': confidence
-    #                 })
-    #             except Exception as e:
-    #                 print(f"Ошибка при обработке {audio_path}: {e}")
-    #                 batch_results.append({
-    #                     'file': audio_path,
-    #                     'predicted_class': 'ERROR',
-    #                     'confidence': 0.0
-    #                 })
-    #
-    #         results.extend(batch_results)
-    #
-    #         print(f"Обработано {min(i+batch_size, len(audio_paths))}/{len(audio_paths)} файлов")
-    #
-    #     return results
-
 
 def get_class_name(label, class_mapping):
     """Универсальное получение имени класса"""
@@ -668,18 +512,13 @@ def main():
     print("\n3. ТЕСТИРОВАНИЕ МОДЕЛИ")
     
     # Загружаем модель если она не была обучена сейчас
-    # if model is None:
-    #     try:
-    #         processor = Wav2Vec2Processor.from_pretrained(MODEL_DIR)
-    #         model = Wav2Vec2ForSequenceClassification.from_pretrained(MODEL_DIR)
-    #     except Exception as e:
-    #         print(f"Ошибка загрузки модели: {e}")
-    #         return
-    
-    # 5. Пример использования классификатора
-    # print("\n5. ПРИМЕР ИСПОЛЬЗОВАНИЯ КЛАССИФИКАТОРА")
-    
-    # classifier = AudioClassifier(MODEL_DIR)
+    if model is None:
+        try:
+            processor = Wav2Vec2Processor.from_pretrained(MODEL_DIR)
+            model = Wav2Vec2ForSequenceClassification.from_pretrained(MODEL_DIR)
+        except Exception as e:
+            print(f"Ошибка загрузки модели: {e}")
+            return
     
     print("\n" + "=" * 60)
     print("ПАЙПЛАЙН ЗАВЕРШЕН!")

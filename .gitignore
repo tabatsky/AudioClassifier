@@ -4,4 +4,7 @@
 *.pth
 *.zip
 *.bak
+*.safetensors
+*.json
+*.bin
 __pycache__
