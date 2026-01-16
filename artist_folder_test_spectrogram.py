@@ -20,10 +20,10 @@ from pydub import AudioSegment
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogram
+from artist_net import ArtistNetSpectrogramV2
 from debug import _print
 
-version_name = 'spectrogram'
+version_name = 'spectrogram_v2'
 
 working_dir = '.'
 
@@ -33,7 +33,7 @@ weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 260
+last_epoch = 50
 
 S = 24000
 N = 3
@@ -68,7 +68,7 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogram()
+artist_net = ArtistNetSpectrogramV2()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
@@ -181,6 +181,6 @@ else:
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig("confusion_matrix_folder_test_spectrogram.png", dpi=150)
+    plt.savefig(f"confusion_matrix_folder_test_{version_name}.png", dpi=150)
     plt.close()
 
