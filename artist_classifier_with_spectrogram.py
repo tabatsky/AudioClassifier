@@ -14,10 +14,10 @@ from sklearn.metrics import classification_report
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV2, sample_len
+from artist_net import ArtistNetSpectrogramV5, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v2'
+version_name = 'spectrogram_v5'
 
 artist_count = 3
 
@@ -195,7 +195,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV2()
+artist_net = ArtistNetSpectrogramV5()
 
 epoch = last_epoch
 
@@ -327,7 +327,7 @@ while epoch < end_epoch:
                 f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator};{loss_value_accumulator};{t1 - t0}\n')
             t0 = t1
 
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
             torch.save(artist_net.state_dict(), fn_weights)
 
