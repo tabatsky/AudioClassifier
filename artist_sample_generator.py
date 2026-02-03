@@ -4,6 +4,8 @@ import random
 
 from pydub import AudioSegment
 
+working_dir = '.'
+
 tracks_dir = f'{working_dir}/audio_data_tracks'
 audio_data_raw_dir = f'{working_dir}/audio_data_raw'
 
