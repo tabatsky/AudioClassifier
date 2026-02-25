@@ -14,10 +14,10 @@ from sklearn.metrics import classification_report
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV6, sample_len
+from artist_net import ArtistNetSpectrogramV8, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v6'
+version_name = 'spectrogram_v8'
 
 artist_count = 3
 
@@ -195,7 +195,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV6()
+artist_net = ArtistNetSpectrogramV8()
 
 epoch = last_epoch
 
@@ -231,7 +231,7 @@ loss = torch.nn.CrossEntropyLoss()
 
 col_summator = torch.ones(artist_count, 1).to(device)
 score_pow_scale = np.log10(2) / np.log10(artist_count)
-sm = torch.nn.Softmax()
+sm = torch.nn.Softmax(dim=1)
 
 
 def calc_score(pred, target):
