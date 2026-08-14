@@ -1,29 +1,22 @@
 import sys
-import os
-import time
 
 import glob
 
 import torch
 import random
 import numpy as np
-import numpy.core.defchararray as np_f
-import csv
-import math
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-from sklearn.model_selection import train_test_split
 
 from pydub import AudioSegment
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV8
+from artist_net import ArtistNetSpectrogramV9
 from debug import _print
 
-version_name = 'spectrogram_v8'
+version_name = 'spectrogram_v9'
 
 working_dir = '.'
 
@@ -33,7 +26,7 @@ weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 65
+last_epoch = 106
 
 S = 24000
 N = 3
@@ -42,10 +35,6 @@ L = 500
 sample_rate = 8000
 
 ktan = 0.03
-USE_IPEX = False
-
-if USE_IPEX:
-    import intel_extension_for_pytorch as ipex
 
 rnd = random.Random()
 
@@ -55,7 +44,7 @@ print('xpu available:', torch.xpu.is_available())
 device = torch.device('cpu')
 if torch.cuda.is_available():
     device = torch.device('cuda:0')
-if torch.xpu.is_available() and USE_IPEX:
+if torch.xpu.is_available():
     device = torch.device('xpu:0')
 
 print('device:', device)
@@ -68,7 +57,7 @@ torch.xpu.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV8()
+artist_net = ArtistNetSpectrogramV9()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
@@ -76,9 +65,6 @@ if last_epoch >= 0:
     artist_net.eval()
 
 artist_net = artist_net.to(device)
-
-if USE_IPEX:
-    artist_net = ipex.optimize(artist_net, dtype=torch.float32)
 
 
 print('preparing neural networking done')

@@ -3,8 +3,6 @@ import time
 import torch
 import random
 import numpy as np
-import numpy.core.defchararray as np_f
-import csv
 
 import os
 
@@ -14,10 +12,10 @@ from sklearn.metrics import classification_report
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV8, sample_len
+from artist_net import ArtistNetSpectrogramV9, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v8'
+version_name = 'spectrogram_v9'
 
 artist_count = 3
 
@@ -72,19 +70,13 @@ else:
     accuracy_accumulator_validate = score_data[-1, 1]
     loss_value_accumulator = score_data[-1, 3]
 
-USE_IPEX = True
-# USE_IPEX = False
-
-if USE_IPEX:
-    import intel_extension_for_pytorch as ipex
-
 print('cuda available:', torch.cuda.is_available())
 print('xpu available:', torch.xpu.is_available())
 
 device = torch.device('cpu')
 if torch.cuda.is_available():
     device = torch.device('cuda:0')
-if torch.xpu.is_available() and USE_IPEX:
+if torch.xpu.is_available():
     device = torch.device('xpu:0')
 
 print('device:', device)
@@ -195,7 +187,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV8()
+artist_net = ArtistNetSpectrogramV9()
 
 epoch = last_epoch
 
@@ -207,9 +199,6 @@ if epoch >= 0:
 artist_net = artist_net.to(device)
 
 optimizer = torch.optim.Adam(artist_net.parameters(), lr=lr)
-
-if USE_IPEX:
-    artist_net, optimizer = ipex.optimize(artist_net, optimizer=optimizer, dtype=torch.float32)
 
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #     optimizer,
@@ -270,6 +259,8 @@ accuracies = []
 
 t0 = time.time()
 
+max_accuracy = 0.0
+
 print('starting training')
 while epoch < end_epoch:
     epoch += 1
@@ -304,32 +295,38 @@ while epoch < end_epoch:
         # if epoch % 5 == 0:
         if True:
             order = np.random.permutation(len(X_validate))
-            validate_batch_indexes = order[0:400]
-            x_validate_batch = X_validate[validate_batch_indexes].to(device)
-            y_validate_batch = y_validate[validate_batch_indexes].to(device)
-            # test_preds = artist_net.inference(x_validate_batch).to(device)
-            test_preds = artist_net.forward(x_validate_batch).to(device)
-            # loss_value = loss(test_preds, y_validate_batch, False).cpu().item()
-            loss_value = loss_value.cpu().item()
-            test_preds_numbers = test_preds.argmax(dim=1).cpu()
-            y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
-            accuracy = (test_preds_numbers == y_validate_numbers).float().mean().item()
-            _print((test_preds_numbers == 0).sum())
-            _print((test_preds_numbers == 1).sum())
-            _print((test_preds_numbers == 2).sum())
+            accuracy = 0.0
+            for i in range(6):
+                validate_batch_indexes = order[900 * i:900 * (i + 1)]
+                x_validate_batch = X_validate[validate_batch_indexes].to(device)
+                y_validate_batch = y_validate[validate_batch_indexes].to(device)
+                # test_preds = artist_net.inference(x_validate_batch).to(device)
+                test_preds = artist_net.forward(x_validate_batch).to(device)
+                test_preds_numbers = test_preds.argmax(dim=1).cpu()
+                y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
+                accuracy += (test_preds_numbers == y_validate_numbers).float().mean().item()
+                _print((test_preds_numbers == 0).sum())
+                _print((test_preds_numbers == 1).sum())
+                _print((test_preds_numbers == 2).sum())
+            accuracy /= 6
             accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
-            print(epoch, accuracy_accumulator_validate, score_accumulator, loss_value_accumulator, scheduler.get_last_lr())
+            print(epoch,  accuracy, max_accuracy, accuracy_accumulator_validate, score_accumulator, loss_value_accumulator, scheduler.get_last_lr())
             epochs.append(epoch)
             accuracies.append(accuracy)
+            print(accuracy, max_accuracy)
+            if accuracy > max_accuracy:
+                max_accuracy = accuracy
+                fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
+                torch.save(artist_net.state_dict(), fn_weights)
             t1 = time.time()
             print('time', t1 - t0)
             with open(accuracy_log, "a") as f:
                 f.write(f'{epoch};{accuracy_accumulator_validate};{score_accumulator};{loss_value_accumulator};{t1 - t0}\n')
             t0 = t1
 
-        if epoch % 5 == 0:
-            fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
-            torch.save(artist_net.state_dict(), fn_weights)
+        # if epoch % 5 == 0:
+        #     fn_weights = f'{weights_dir}/model_weights_epoch_{epoch}.pth'
+        #     torch.save(artist_net.state_dict(), fn_weights)
 
 order = np.random.permutation(len(X_validate))
 validate_batch_indexes = order[0:1000]

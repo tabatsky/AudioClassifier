@@ -3,8 +3,6 @@ import time
 import torch
 import random
 import numpy as np
-import numpy.core.defchararray as np_f
-import csv
 
 import os
 
@@ -66,19 +64,13 @@ else:
     accuracy_accumulator_validate = score_data[-1, 1]
     loss_value_accumulator = score_data[-1, 3]
 
-USE_IPEX = True
-# USE_IPEX = False
-
-if USE_IPEX:
-    import intel_extension_for_pytorch as ipex
-
 print('cuda available:', torch.cuda.is_available())
 print('xpu available:', torch.xpu.is_available())
 
 device = torch.device('cpu')
 if torch.cuda.is_available():
     device = torch.device('cuda:0')
-if torch.xpu.is_available() and USE_IPEX:
+if torch.xpu.is_available():
     device = torch.device('xpu:0')
 
 print('device:', device)
@@ -185,9 +177,6 @@ if epoch >= 0:
 artist_net = artist_net.to(device)
 
 optimizer = torch.optim.Adam(artist_net.parameters(), lr=lr)
-
-if USE_IPEX:
-    artist_net, optimizer = ipex.optimize(artist_net, optimizer=optimizer, dtype=torch.float32)
 
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #     optimizer,

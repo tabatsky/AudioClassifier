@@ -1,9 +1,4 @@
 import torch
-import random
-import numpy as np
-import numpy.core.defchararray as np_f
-import csv
-import math
 
 from debug import _print
 
@@ -1669,6 +1664,157 @@ class ArtistNetSpectrogramV8(torch.nn.Module):
         x = self.fc3(x)
         _print(x.shape)
         x = self.activ3(x * ktan) / ktan
+        x = self.fc4(x)
+        _print(x.shape)
+        # x = x.reshape(batch_size, -1)
+        # _print(x.shape)
+        # x = self.sm(x)
+        # _print(x.shape)
+        return x
+
+    def inference(self, x):
+        x = self.forward(x)
+        x = self.sm(x)
+        return x
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class XPUDropout(nn.Module):
+    def __init__(self, p=0.5, inplace=False):
+        super().__init__()
+        self.p = p
+        self.inplace = inplace
+
+    def forward(self, input):
+        if self.training and self.p > 0:
+            # Custom implementation for XPU
+            if input.device.type == 'xpu':
+                # Create mask on XPU
+                mask = torch.rand_like(input) > self.p
+                zero_tensor = torch.FloatTensor([0.0]).to(input.device)
+                one_tensor = torch.FloatTensor([1.0]).to(input.device)
+                mask = torch.where(mask, one_tensor, zero_tensor)
+
+                # Scale output
+                # output = input * mask / (1 - self.p)
+                output = input * mask
+                return output
+            else:
+                # Use PyTorch's native implementation for other devices
+                return F.dropout2d(input, self.p, self.training, self.inplace)
+        return input
+
+
+class ArtistNetSpectrogramV9(torch.nn.Module):
+    def __init__(self, W=129, H=107, N=artist_count,
+                 conv1_channels=36,
+                 conv1_Wpadding=2, conv1_Hpadding=3,
+                 conv1_Wkernel=3, conv1_Hkernel=3,
+                 conv1_stride=2,
+                 pool1_Wkernel=6, pool1_Hkernel=7,
+                 convA_Wkernel=9, convA_Hkernel=7,
+                 convA_Wpadding=4, convA_Hpadding=3,
+                 convA_stride=1,
+                 conv2_channels=36,
+                 conv2_Wpadding=1, conv2_Hpadding=1,
+                 conv2_Wkernel=3, conv2_Hkernel=3,
+                 conv2_stride=1,
+                 pool2_Wkernel=11, pool2_Hkernel=8):
+        super(ArtistNetSpectrogramV9, self).__init__()
+
+        self.W = W
+        self.H = H
+        self.N = N
+
+        self.Wc1 = (W - conv1_Wkernel + 2 * conv1_Wpadding) // conv1_stride + 1
+        print('Wc1', self.Wc1)
+        self.Hc1 = (H - conv1_Hkernel + 2 * conv1_Hpadding) // conv1_stride + 1
+        print('Hc1', self.Hc1)
+        # self.S1 = conv1_channels * self.Sc1 // pool1_kernel
+        # print('S1', self.S1)
+        self.Wf1 = self.Wc1 // pool1_Wkernel
+        print('Wf1', self.Wf1)
+        self.Hf1 = self.Hc1 // pool1_Hkernel
+        print('Hf1', self.Hf1)
+        self.Wc2 = (self.Wf1 - conv2_Wkernel + 2 * conv2_Wpadding) // conv2_stride + 1
+        print('Wc2', self.Wc2)
+        self.Hc2 = (self.Hf1 - conv2_Hkernel + 2 * conv2_Hpadding) // conv2_stride + 1
+        print('Hc2', self.Hc2)
+        self.Wf2 = self.Wc2 // pool2_Wkernel
+        print('Sf2', self.Wf2)
+        self.Hf2 = self.Hc2 // pool2_Hkernel
+        print('Hf2', self.Hf2)
+        self.S2 = conv2_channels * self.Wf2 * self.Hf2
+        print('S2', self.S2)
+        self.n_hidden_neurons = self.S2 * 6
+        # self.n_hidden_neurons = 240
+        # self.n_hidden_neurons = self.S1
+        print('n_hidden_neurons', self.n_hidden_neurons)
+
+        # self.fc0 = torch.nn.Linear(self.S, self.n_hidden_neurons)
+        # self.activ0 = torch.nn.Tanh()
+        self.conv1 = torch.nn.Conv2d(1, conv1_channels,
+                                     (conv1_Wkernel, conv1_Hkernel), stride=(conv1_stride, conv1_stride),
+                                     padding=(conv1_Wpadding, conv1_Hpadding), groups=1)
+        self.convA1 = torch.nn.Conv2d(conv1_channels, conv1_channels, (convA_Wkernel, convA_Hkernel),
+                                      stride=(convA_stride, convA_stride),
+                                      padding=(convA_Wpadding, convA_Hpadding), groups=conv1_channels)
+        self.convA2 = torch.nn.Conv2d(conv1_channels, conv1_channels, (convA_Wkernel, convA_Hkernel),
+                                      stride=(convA_stride, convA_stride),
+                                      padding=(convA_Wpadding, convA_Hpadding), groups=conv1_channels)
+        self.convA3 = torch.nn.Conv2d(conv1_channels, conv1_channels, (convA_Wkernel, convA_Hkernel),
+                                      stride=(convA_stride, convA_stride),
+                                      padding=(convA_Wpadding, convA_Hpadding), groups=conv1_channels)
+        self.convA4 = torch.nn.Conv2d(conv1_channels, conv1_channels, (convA_Wkernel, convA_Hkernel),
+                                      stride=(convA_stride, convA_stride),
+                                      padding=(convA_Wpadding, convA_Hpadding), groups=conv1_channels)
+        self.convA5 = torch.nn.Conv2d(conv1_channels, conv1_channels, (convA_Wkernel, convA_Hkernel),
+                                      stride=(convA_stride, convA_stride),
+                                      padding=(convA_Wpadding, convA_Hpadding), groups=conv1_channels)
+        self.maxpool1 = torch.nn.MaxPool2d(kernel_size=(pool1_Wkernel, pool1_Hkernel))
+        self.conv2 = torch.nn.Conv2d(conv1_channels, conv2_channels,
+                                     (conv2_Wkernel, conv2_Hkernel), stride=(conv2_stride, conv2_stride),
+                                     padding=(conv2_Wpadding, conv2_Hpadding), groups=1)
+        self.maxpool2 = torch.nn.MaxPool2d(kernel_size=(pool2_Wkernel, pool2_Hkernel))
+        self.fc1 = torch.nn.Linear(self.S2, self.n_hidden_neurons)
+        self.activ1 = torch.nn.ReLU()
+        self.dp1 = XPUDropout(0.5)
+        self.fc3 = torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons)
+        self.activ3 = torch.nn.ReLU()
+        self.dp2 = XPUDropout(0.5)
+        self.fc4 = torch.nn.Linear(self.n_hidden_neurons, N)
+        self.sm = torch.nn.Softmax(dim=1)
+
+    def forward(self, x):
+        _print('forward')
+        batch_size = list(x.shape)[0]
+        x = x.reshape(batch_size, 1, self.W, self.H)
+        x = self.conv1(x)
+        _print(x.shape)
+        for conv in [self.convA1, self.convA2, self.convA3, self.convA4, self.convA5]:
+            x1 = conv(x)
+            x = x + x1
+        x = self.maxpool1(x)
+        _print(x.shape)
+        x = self.conv2(x)
+        _print(x.shape)
+        x = self.maxpool2(x)
+        _print(x.shape)
+        x = x.reshape(batch_size, -1)
+        # x = x.transpose(1, 2)
+        _print(x.shape)
+        x = self.fc1(x)
+        _print(x.shape)
+        x = self.activ1(x * ktan) / ktan
+        x = self.dp1(x)
+        x = self.fc3(x)
+        _print(x.shape)
+        x = self.activ3(x * ktan) / ktan
+        x = self.dp2(x)
         x = self.fc4(x)
         _print(x.shape)
         # x = x.reshape(batch_size, -1)

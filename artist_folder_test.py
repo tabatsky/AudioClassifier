@@ -1,20 +1,13 @@
 import sys
-import os
-import time
 
 import glob
 
 import torch
 import random
 import numpy as np
-import numpy.core.defchararray as np_f
-import csv
-import math
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-from sklearn.model_selection import train_test_split
 
 from pydub import AudioSegment
 
@@ -36,10 +29,6 @@ N = 3
 L = 500
 
 ktan = 0.03
-USE_IPEX = False
-
-if USE_IPEX:
-    import intel_extension_for_pytorch as ipex
 
 rnd = random.Random()
 
@@ -49,7 +38,7 @@ print('xpu available:', torch.xpu.is_available())
 device = torch.device('cpu')
 if torch.cuda.is_available():
     device = torch.device('cuda:0')
-if torch.xpu.is_available() and USE_IPEX:
+if torch.xpu.is_available():
     device = torch.device('xpu:0')
 
 print('device:', device)
@@ -70,10 +59,6 @@ if last_epoch >= 0:
     artist_net.eval()
 
 artist_net = artist_net.to(device)
-
-if USE_IPEX:
-    artist_net = ipex.optimize(artist_net, dtype=torch.float32)
-
 
 print('preparing neural networking done')
 
