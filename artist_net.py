@@ -1683,30 +1683,30 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class XPUDropout(nn.Module):
-    def __init__(self, p=0.5, inplace=False):
-        super().__init__()
-        self.p = p
-        self.inplace = inplace
-
-    def forward(self, input):
-        if self.training and self.p > 0:
-            # Custom implementation for XPU
-            if input.device.type == 'xpu':
-                # Create mask on XPU
-                mask = torch.rand_like(input) > self.p
-                zero_tensor = torch.FloatTensor([0.0]).to(input.device)
-                one_tensor = torch.FloatTensor([1.0]).to(input.device)
-                mask = torch.where(mask, one_tensor, zero_tensor)
-
-                # Scale output
-                # output = input * mask / (1 - self.p)
-                output = input * mask
-                return output
-            else:
-                # Use PyTorch's native implementation for other devices
-                return F.dropout2d(input, self.p, self.training, self.inplace)
-        return input
+# class XPUDropout(nn.Module):
+#     def __init__(self, p=0.5, inplace=False):
+#         super().__init__()
+#         self.p = p
+#         self.inplace = inplace
+#
+#     def forward(self, input):
+#         if self.training and self.p > 0:
+#             # Custom implementation for XPU
+#             if input.device.type == 'xpu':
+#                 # Create mask on XPU
+#                 mask = torch.rand_like(input) > self.p
+#                 zero_tensor = torch.FloatTensor([0.0]).to(input.device)
+#                 one_tensor = torch.FloatTensor([1.0]).to(input.device)
+#                 mask = torch.where(mask, one_tensor, zero_tensor)
+#
+#                 # Scale output
+#                 # output = input * mask / (1 - self.p)
+#                 output = input * mask
+#                 return output
+#             else:
+#                 # Use PyTorch's native implementation for other devices
+#                 return F.dropout2d(input, self.p, self.training, self.inplace)
+#         return input
 
 
 class ArtistNetSpectrogramV9(torch.nn.Module):
@@ -1782,10 +1782,10 @@ class ArtistNetSpectrogramV9(torch.nn.Module):
         self.maxpool2 = torch.nn.MaxPool2d(kernel_size=(pool2_Wkernel, pool2_Hkernel))
         self.fc1 = torch.nn.Linear(self.S2, self.n_hidden_neurons)
         self.activ1 = torch.nn.ReLU()
-        self.dp1 = XPUDropout(0.5)
+        self.dp1 = torch.nn.Dropout(0.5)
         self.fc3 = torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons)
         self.activ3 = torch.nn.ReLU()
-        self.dp2 = XPUDropout(0.5)
+        self.dp2 = torch.nn.Dropout(0.5)
         self.fc4 = torch.nn.Linear(self.n_hidden_neurons, N)
         self.sm = torch.nn.Softmax(dim=1)
 

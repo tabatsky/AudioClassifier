@@ -20,10 +20,10 @@ samples_per_frame_rate_per_file = 400
 # samples_per_frame_rate_per_file = 300
 samples_per_file = len(FRAME_RATES) * samples_per_frame_rate_per_file
 
-files_per_artist_train = 12
-files_per_artist_validate = 4
-# files_per_artist_train = 18
-# files_per_artist_validate = 6
+# files_per_artist_train = 12
+# files_per_artist_validate = 4
+files_per_artist_train = 18
+files_per_artist_validate = 6
 
 files_per_artist_total = files_per_artist_train + files_per_artist_validate
 

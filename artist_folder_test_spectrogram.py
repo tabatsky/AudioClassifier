@@ -20,13 +20,16 @@ version_name = 'spectrogram_v9'
 
 working_dir = '.'
 
-# weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
-weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
+# suffix = '3_400_16'
+# suffix = '3_300_24'
+suffix = '3_400_24'
+
+weights_dir = f'{working_dir}/weights/{version_name}_{suffix}_weights'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 106
+last_epoch = 94
 
 S = 24000
 N = 3
@@ -167,6 +170,6 @@ else:
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig(f"confusion_matrix_folder_test_{version_name}.png", dpi=150)
+    plt.savefig(f"confusion_matrix_folder_test_{version_name}_{suffix}.png", dpi=150)
     plt.close()
 
