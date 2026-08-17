@@ -15,9 +15,10 @@ SAMPLE_LENGTH = 24000
 
 artist_count = 3
 
-samples_per_frame_rate_per_file = 400
+# samples_per_frame_rate_per_file = 400
 # samples_per_frame_rate_per_file = 200
 # samples_per_frame_rate_per_file = 300
+samples_per_frame_rate_per_file = 600
 samples_per_file = len(FRAME_RATES) * samples_per_frame_rate_per_file
 
 # files_per_artist_train = 12

@@ -22,14 +22,15 @@ working_dir = '.'
 
 # suffix = '3_400_16'
 # suffix = '3_300_24'
-suffix = '3_400_24'
+# suffix = '3_400_24'
+suffix = '3_600_24'
 
 weights_dir = f'{working_dir}/weights/{version_name}_{suffix}_weights'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 94
+last_epoch = 28
 
 S = 24000
 N = 3

@@ -19,7 +19,8 @@ version_name = 'spectrogram_v9'
 
 artist_count = 3
 
-samples_per_file = 400
+samples_per_file = 600
+# samples_per_file = 400
 # samples_per_file = 300
 
 files_per_artist_train = 18
