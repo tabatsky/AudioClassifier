@@ -12,10 +12,10 @@ from sklearn.metrics import classification_report
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV9, sample_len
+from artist_net import ArtistNetSpectrogramV13, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v9'
+version_name = 'spectrogram_v13'
 
 artist_count = 3
 
@@ -48,9 +48,11 @@ audio_data_raw_dir = f'{working_dir}/audio_data_raw'
 
 accuracy_log = f'{working_dir}/accuracy/{version_name}_{artist_count}_{samples_per_file}_{files_per_artist_total}_accuracy.csv'
 
-lr = 1e-3
+lr = 2e-3
+lr_gamma = 0.95
 # the_batch_size = 100
-the_batch_size = 200
+# the_batch_size = 200
+the_batch_size = 600
 
 sample_rate = 8000
 
@@ -189,7 +191,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV9()
+artist_net = ArtistNetSpectrogramV13()
 
 epoch = last_epoch
 
@@ -210,7 +212,7 @@ optimizer = torch.optim.Adam(artist_net.parameters(), lr=lr)
 #     min_lr=1e-6
 # )
 
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.995)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=lr_gamma)
 for i in range(last_epoch):
     scheduler.step()
 
