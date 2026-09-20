@@ -12,10 +12,10 @@ from sklearn.metrics import classification_report
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV13, sample_len
+from artist_net import ArtistNetSpectrogramV14, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v13'
+version_name = 'spectrogram_v14'
 
 artist_count = 3
 
@@ -48,8 +48,8 @@ audio_data_raw_dir = f'{working_dir}/audio_data_raw'
 
 accuracy_log = f'{working_dir}/accuracy/{version_name}_{artist_count}_{samples_per_file}_{files_per_artist_total}_accuracy.csv'
 
-lr = 2e-3
-lr_gamma = 0.95
+lr = 1e-3
+lr_gamma = 0.9
 # the_batch_size = 100
 # the_batch_size = 200
 the_batch_size = 600
@@ -191,7 +191,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV13()
+artist_net = ArtistNetSpectrogramV14()
 
 epoch = last_epoch
 
