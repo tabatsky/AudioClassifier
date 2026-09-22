@@ -8,14 +8,14 @@ import os
 
 import pandas as pd
 
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV14, sample_len
+from artist_net import ArtistNetSpectrogramV15, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v14'
+version_name = 'spectrogram_v15'
 
 artist_count = 3
 
@@ -49,7 +49,7 @@ audio_data_raw_dir = f'{working_dir}/audio_data_raw'
 accuracy_log = f'{working_dir}/accuracy/{version_name}_{artist_count}_{samples_per_file}_{files_per_artist_total}_accuracy.csv'
 
 lr = 1e-3
-lr_gamma = 0.9
+lr_gamma = 0.99
 # the_batch_size = 100
 # the_batch_size = 200
 the_batch_size = 600
@@ -191,7 +191,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV14()
+artist_net = ArtistNetSpectrogramV15()
 
 epoch = last_epoch
 
@@ -299,20 +299,27 @@ while epoch < end_epoch:
         # if epoch % 5 == 0:
         if True:
             order = np.random.permutation(len(X_validate))
-            accuracy = 0.0
+            # accuracy = 0.0
+            all_preds, all_labels = [], []
             for i in range(6):
                 validate_batch_indexes = order[900 * i:900 * (i + 1)]
                 x_validate_batch = X_validate[validate_batch_indexes].to(device)
                 y_validate_batch = y_validate[validate_batch_indexes].to(device)
                 # test_preds = artist_net.inference(x_validate_batch).to(device)
                 test_preds = artist_net.forward(x_validate_batch).to(device)
-                test_preds_numbers = test_preds.argmax(dim=1).cpu()
-                y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
-                accuracy += (test_preds_numbers == y_validate_numbers).float().mean().item()
-                _print((test_preds_numbers == 0).sum())
-                _print((test_preds_numbers == 1).sum())
-                _print((test_preds_numbers == 2).sum())
-            accuracy /= 6
+                # test_preds_numbers = test_preds.argmax(dim=1).cpu()
+                # y_validate_numbers = y_validate_batch.argmax(dim=1).cpu()
+                all_preds.append(test_preds.argmax(dim=1).cpu())
+                all_labels.append(y_validate_batch.argmax(dim=1).cpu())
+                # accuracy += (test_preds_numbers == y_validate_numbers).float().mean().item()
+                # _print((test_preds_numbers == 0).sum())
+                # _print((test_preds_numbers == 1).sum())
+                # _print((test_preds_numbers == 2).sum())
+            # accuracy /= 6
+            all_preds = torch.cat(all_preds).numpy()
+            all_labels = torch.cat(all_labels).numpy()
+            f1 = f1_score(all_labels, all_preds, average='macro')
+            accuracy = f1
             accuracy_accumulator_validate = accuracy_accumulator_validate * accum_coeff + accuracy * (1 - accum_coeff)
             print(epoch, accuracy_accumulator_validate, score_accumulator, loss_value_accumulator, scheduler.get_last_lr())
             epochs.append(epoch)
