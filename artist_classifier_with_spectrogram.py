@@ -12,10 +12,10 @@ from sklearn.metrics import classification_report, f1_score
 
 from scipy import signal
 
-from artist_net import ArtistNetSpectrogramV15, sample_len
+from artist_net import ArtistNetSpectrogramV16, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v15'
+version_name = 'spectrogram_v16'
 
 artist_count = 3
 
@@ -191,7 +191,7 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV15()
+artist_net = ArtistNetSpectrogramV16()
 
 epoch = last_epoch
 
