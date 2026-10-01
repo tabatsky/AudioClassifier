@@ -17,6 +17,9 @@ from scipy import signal
 from artist_net import ArtistNetSpectrogramV17
 from debug import _print
 
+import intel_npu_acceleration_library
+from intel_npu_acceleration_library.compiler import CompilerConfig
+
 version_name = 'spectrogram_v17'
 
 working_dir = '.'
@@ -46,13 +49,13 @@ rnd = random.Random()
 print('cuda available:', torch.cuda.is_available())
 print('xpu available:', torch.xpu.is_available())
 
-device = torch.device('cpu')
-if torch.cuda.is_available():
-    device = torch.device('cuda:0')
-if torch.xpu.is_available():
-    device = torch.device('xpu:0')
-
-print('device:', device)
+# device = torch.device('cpu')
+# if torch.cuda.is_available():
+#     device = torch.device('cuda:0')
+# if torch.xpu.is_available():
+#     device = torch.device('xpu:0')
+#
+# print('device:', device)
 
 random.seed(0)
 np.random.seed(0)
@@ -66,11 +69,15 @@ artist_net = ArtistNetSpectrogramV17()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
-    artist_net.load_state_dict(torch.load(fn_weights))
+    artist_net.load_state_dict(torch.load(fn_weights, map_location=torch.device('cpu') ))
     artist_net.eval()
 
-artist_net = artist_net.to(device)
-
+compiler_conf = CompilerConfig(
+    dtype=torch.bfloat16,  # Явно укажите float32
+    training=False # Если поддерживается
+)
+# compiler_conf = CompilerConfig(training=True)
+artist_net = intel_npu_acceleration_library.compile(artist_net, compiler_conf)
 
 print('preparing neural networking done')
 
@@ -115,7 +122,7 @@ def detect_file_type(fn_in_mp3):
     audio_data_spectrograms = np.array(audio_data_spectrograms)
     print(audio_data_spectrograms.shape)
 
-    X = torch.FloatTensor(audio_data_spectrograms).to(device)
+    X = torch.FloatTensor(audio_data_spectrograms).bfloat16() #.to(device)
     # X = X.divide(255.0).subtract(0.5)
 
     pred = artist_net.inference(X)
@@ -180,4 +187,3 @@ else:
 
 t1 = time.time()
 print(t1 - t0)
-
