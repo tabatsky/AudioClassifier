@@ -2975,35 +2975,44 @@ class ArtistNetSpectrogramV18(torch.nn.Module):
 
         self.activ = torch.nn.LeakyReLU()
 
+        # self.cond_dp0 = torch.nn.Dropout2d(p=0.1)
         self.conv1 = torch.nn.Conv2d(1, conv1_channels,
                                      (conv1_Wkernel, conv1_Hkernel), stride=(conv1_stride, conv1_stride),
                                      padding=(conv1_Wpadding, conv1_Hpadding), groups=1)
         self.conv_bn1 = torch.nn.BatchNorm2d(num_features=conv1_channels)
+        self.cond_dp1 = torch.nn.Dropout2d(p=0.1)
         self.conv2 = torch.nn.Conv2d(conv1_channels, conv2_channels,
                                      (conv2_Wkernel, conv2_Hkernel), stride=(conv2_stride, conv2_stride),
                                      padding=(conv2_Wpadding, conv2_Hpadding), groups=1)
         self.conv_bn2 = torch.nn.BatchNorm2d(num_features=conv2_channels)
+        self.cond_dp2 = torch.nn.Dropout2d(p=0.1)
         self.conv3 = torch.nn.Conv2d(conv2_channels, conv3_channels,
                                      (conv3_Wkernel, conv3_Hkernel), stride=(conv3_stride, conv3_stride),
                                      padding=(conv3_Wpadding, conv3_Hpadding), groups=1)
         self.conv_bn3 = torch.nn.BatchNorm2d(num_features=conv3_channels)
+        self.cond_dp3 = torch.nn.Dropout2d(p=0.1)
         self.conv4 = torch.nn.Conv2d(conv3_channels, conv4_channels,
                                      (conv4_Wkernel, conv4_Hkernel), stride=(conv4_stride, conv4_stride),
                                      padding=(conv4_Wpadding, conv4_Hpadding), groups=1)
         self.conv_bn4 = torch.nn.BatchNorm2d(num_features=conv4_channels)
+        self.cond_dp4 = torch.nn.Dropout2d(p=0.1)
         self.conv5 = torch.nn.Conv2d(conv4_channels, conv5_channels,
                                      (conv5_Wkernel, conv5_Hkernel), stride=(conv5_stride, conv5_stride),
                                      padding=(conv5_Wpadding, conv5_Hpadding), groups=1)
         self.conv_bn5 = torch.nn.BatchNorm2d(num_features=conv5_channels)
 
+        self.dp0 = torch.nn.Dropout(p=0.1)
         self.fc1 = torch.nn.Linear(self.S5, self.n_hidden_neurons)
         self.fc_bn1 = torch.nn.BatchNorm1d(num_features=self.n_hidden_neurons)
+        self.dp1 = torch.nn.Dropout(p=0.1)
         self.fc2 = torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons)
         self.fc_bn2 = torch.nn.BatchNorm1d(num_features=self.n_hidden_neurons)
+        self.dp2 = torch.nn.Dropout(p=0.1)
         self.fc3 = torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons)
         self.fc_bn3 = torch.nn.BatchNorm1d(num_features=self.n_hidden_neurons)
+        self.dp3 = torch.nn.Dropout(p=0.1)
         self.fc4 = torch.nn.Linear(self.n_hidden_neurons, 2 * N)
-        self.fc_bn4 = torch.nn.BatchNorm1d(num_features=2 * N)
+        # self.fc_bn4 = torch.nn.BatchNorm1d(num_features=2 * N)
         self.maxpool = torch.nn.MaxPool1d(2)
         self.sm = torch.nn.Softmax(dim=1)
 
@@ -3011,26 +3020,36 @@ class ArtistNetSpectrogramV18(torch.nn.Module):
         _print('forward')
         batch_size = list(x.shape)[0]
         x = x.reshape(batch_size, 1, self.W, self.H)
+        # x = self.cond_dp0(x)
         x = self.activ(self.conv_bn1(self.conv1(x)))
         _print(x.shape)
+        x = self.cond_dp1(x)
         x = self.activ(self.conv_bn2(self.conv2(x)))
         _print(x.shape)
+        x = self.cond_dp2(x)
         x = self.activ(self.conv_bn3(self.conv3(x)))
         _print(x.shape)
+        x = self.cond_dp3(x)
         x = self.activ(self.conv_bn4(self.conv4(x)))
         _print(x.shape)
+        x = self.cond_dp4(x)
         x = self.activ(self.conv_bn5(self.conv5(x)))
         _print(x.shape)
         x = x.reshape(batch_size, -1)
+        x = self.dp0(x)
         # x = x.transpose(1, 2)
         _print(x.shape)
         x = self.activ(self.fc_bn1(self.fc1(x)))
+        x = self.dp1(x)
         _print(x.shape)
         x = self.activ(self.fc_bn2(self.fc2(x)))
+        x = self.dp2(x)
         _print(x.shape)
         x = self.activ(self.fc_bn3(self.fc3(x)))
+        x = self.dp3(x)
         _print(x.shape)
-        x = self.activ(self.fc_bn4(self.fc4(x)))
+        # x = self.activ(self.fc_bn4(self.fc4(x)))
+        x = self.fc4(x)
         _print(x.shape)
         x = self.maxpool(x)
         _print(x.shape)

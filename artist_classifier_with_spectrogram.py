@@ -57,7 +57,7 @@ the_batch_size = 600
 sample_rate = 8000
 
 last_epoch = -1
-end_epoch = 300
+end_epoch = 50
 
 accum_coeff = 0.9
 
@@ -202,7 +202,8 @@ if epoch >= 0:
 
 artist_net = artist_net.to(device)
 
-optimizer = torch.optim.AdamW(artist_net.parameters(), lr=lr, weight_decay=0.01)
+# optimizer = torch.optim.AdamW(artist_net.parameters(), lr=lr, weight_decay=0.01)
+optimizer = torch.optim.Adam(artist_net.parameters(), lr=lr)
 
 # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #     optimizer,
