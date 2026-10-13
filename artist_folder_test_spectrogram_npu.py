@@ -34,7 +34,7 @@ weights_dir = f'{working_dir}/weights/{version_name}_{suffix}_weights'
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 25
+last_epoch = 4
 
 S = 24000
 N = 3
