@@ -3053,3 +3053,152 @@ class ArtistNetSpectrogramV18(torch.nn.Module):
         x = self.forward(x)
         x = self.sm(x)
         return x
+
+
+class ArtistNetSpectrogramV19(torch.nn.Module):
+    def __init__(self, W=129, H=107, N=artist_count,
+                 conv1_channels=32,
+                 conv1_Wpadding=9, conv1_Hpadding=6,
+                 conv1_Wkernel=15, conv1_Hkernel=15,
+                 conv1_stride=3,
+                 conv2_channels=128,
+                 conv2_Wpadding=4, conv2_Hpadding=9,
+                 conv2_Wkernel=11, conv2_Hkernel=11,
+                 conv2_stride=3,
+                 conv3_channels=512,
+                 conv3_Wpadding=2, conv3_Hpadding=2,
+                 conv3_Wkernel=7, conv3_Hkernel=7,
+                 conv3_stride=3,
+                 conv4_channels=2048,
+                 conv4_Wpadding=3, conv4_Hpadding=3,
+                 conv4_Wkernel=5, conv4_Hkernel=5,
+                 conv4_stride=3,
+                 conv5_channels=4096,
+                 conv5_Wpadding=0, conv5_Hpadding=0,
+                 conv5_Wkernel=3, conv5_Hkernel=3,
+                 conv5_stride=1
+                 ):
+        super(ArtistNetSpectrogramV19, self).__init__()
+
+        self.W = W
+        self.H = H
+        self.N = N
+
+        self.Wc1 = (W - conv1_Wkernel + 2 * conv1_Wpadding) // conv1_stride + 1
+        print('Wc1', self.Wc1)
+        self.Hc1 = (H - conv1_Hkernel + 2 * conv1_Hpadding) // conv1_stride + 1
+        print('Hc1', self.Hc1)
+        # self.S1 = conv1_channels * self.Sc1 // pool1_kernel
+        # print('S1', self.S1)
+        self.Wf1 = self.Wc1
+        print('Wf1', self.Wf1)
+        self.Hf1 = self.Hc1
+        print('Hf1', self.Hf1)
+        self.Wc2 = (self.Wf1 - conv2_Wkernel + 2 * conv2_Wpadding) // conv2_stride + 1
+        print('Wc2', self.Wc2)
+        self.Hc2 = (self.Hf1 - conv2_Hkernel + 2 * conv2_Hpadding) // conv2_stride + 1
+        print('Hc2', self.Hc2)
+        self.Wf2 = self.Wc2
+        print('Wf2', self.Wf2)
+        self.Hf2 = self.Hc2
+        print('Hf2', self.Hf2)
+        self.Wc3 = (self.Wf2 - conv3_Wkernel + 2 * conv3_Wpadding) // conv3_stride + 1
+        print('Wc3', self.Wc3)
+        self.Hc3= (self.Hf2 - conv3_Hkernel + 2 * conv3_Hpadding) // conv3_stride + 1
+        print('Hc3', self.Hc3)
+        self.Wf3 = self.Wc3
+        print('Wf3', self.Wf3)
+        self.Hf3 = self.Hc3
+        print('Hf3', self.Hf3)
+        self.Wc4 = (self.Wf3 - conv4_Wkernel + 2 * conv4_Wpadding) // conv4_stride + 1
+        print('Wc4', self.Wc4)
+        self.Hc4 = (self.Hf3 - conv4_Hkernel + 2 * conv4_Hpadding) // conv4_stride + 1
+        print('Hc4', self.Hc4)
+        self.Wf4 = self.Wc4
+        print('Wf4', self.Wf4)
+        self.Hf4 = self.Hc4
+        print('Hf4', self.Hf4)
+        self.Wc5 = (self.Wf4 - conv5_Wkernel + 2 * conv5_Wpadding) // conv5_stride + 1
+        print('Wc5', self.Wc5)
+        self.Hc5 = (self.Hf4 - conv5_Hkernel + 2 * conv5_Hpadding) // conv5_stride + 1
+        print('Hc5', self.Hc5)
+        self.Wf5 = self.Wc5
+        print('Wf5', self.Wf5)
+        self.Hf5 = self.Hc5
+        print('Hf5', self.Hf5)
+        self.S5 = conv5_channels * self.Wf5 * self.Hf5
+        print('S5', self.S5)
+        self.n_hidden_neurons = self.S5 * 1 // 2
+        print('n_hidden_neurons', self.n_hidden_neurons)
+
+        self.activ = torch.nn.LeakyReLU()
+
+        self.conv1 = torch.nn.Conv2d(1, conv1_channels,
+                                     (conv1_Wkernel, conv1_Hkernel), stride=(conv1_stride, conv1_stride),
+                                     padding=(conv1_Wpadding, conv1_Hpadding), groups=1)
+        self.conv_bn1 = torch.nn.BatchNorm2d(num_features=conv1_channels)
+        self.conv2 = torch.nn.Conv2d(conv1_channels, conv2_channels,
+                                     (conv2_Wkernel, conv2_Hkernel), stride=(conv2_stride, conv2_stride),
+                                     padding=(conv2_Wpadding, conv2_Hpadding), groups=1)
+        self.conv_bn2 = torch.nn.BatchNorm2d(num_features=conv2_channels)
+        self.conv3 = torch.nn.Conv2d(conv2_channels, conv3_channels,
+                                     (conv3_Wkernel, conv3_Hkernel), stride=(conv3_stride, conv3_stride),
+                                     padding=(conv3_Wpadding, conv3_Hpadding), groups=1)
+        self.conv_bn3 = torch.nn.BatchNorm2d(num_features=conv3_channels)
+        self.conv4 = torch.nn.Conv2d(conv3_channels, conv4_channels,
+                                     (conv4_Wkernel, conv4_Hkernel), stride=(conv4_stride, conv4_stride),
+                                     padding=(conv4_Wpadding, conv4_Hpadding), groups=1)
+        self.conv_bn4 = torch.nn.BatchNorm2d(num_features=conv4_channels)
+        self.conv5 = torch.nn.Conv2d(conv4_channels, conv5_channels,
+                                     (conv5_Wkernel, conv5_Hkernel), stride=(conv5_stride, conv5_stride),
+                                     padding=(conv5_Wpadding, conv5_Hpadding), groups=1)
+        self.conv_bn5 = torch.nn.BatchNorm2d(num_features=conv5_channels)
+
+        self.dp0 = torch.nn.Dropout(p=0.5)
+        self.fc1 = torch.nn.Linear(self.S5, self.n_hidden_neurons)
+        self.fc_bn1 = torch.nn.BatchNorm1d(num_features=self.n_hidden_neurons)
+        self.dp1 = torch.nn.Dropout(p=0.5)
+        self.fc2 = torch.nn.Linear(self.n_hidden_neurons, self.n_hidden_neurons)
+        self.fc_bn2 = torch.nn.BatchNorm1d(num_features=self.n_hidden_neurons)
+        self.fc4 = torch.nn.Linear(self.n_hidden_neurons, N)
+        # self.maxpool = torch.nn.MaxPool1d(32 * N)
+        self.sm = torch.nn.Softmax(dim=1)
+
+    def forward(self, x):
+        _print('forward')
+        batch_size = list(x.shape)[0]
+        x = x.reshape(batch_size, 1, self.W, self.H)
+        x = self.activ(self.conv_bn1(self.conv1(x)))
+        _print(x.shape)
+        x = self.activ(self.conv_bn2(self.conv2(x)))
+        _print(x.shape)
+        x = self.activ(self.conv_bn3(self.conv3(x)))
+        _print(x.shape)
+        x = self.activ(self.conv_bn4(self.conv4(x)))
+        _print(x.shape)
+        x = self.activ(self.conv_bn5(self.conv5(x)))
+        _print(x.shape)
+        x = x.reshape(batch_size, -1)
+        x = self.dp0(x)
+        # x = x.transpose(1, 2)
+        _print(x.shape)
+        x = self.activ(self.fc_bn1(self.fc1(x)))
+        x = self.dp1(x)
+        _print(x.shape)
+        x = self.activ(self.fc_bn2(self.fc2(x)))
+        _print(x.shape)
+        # x = self.activ(self.fc_bn4(self.fc4(x)))
+        x = self.fc4(x)
+        _print(x.shape)
+        # x = self.maxpool(x)
+        # _print(x.shape)
+        # x = x.reshape(batch_size, -1)
+        # _print(x.shape)
+        # x = self.sm(x)
+        # _print(x.shape)
+        return x
+
+    def inference(self, x):
+        x = self.forward(x)
+        x = self.sm(x)
+        return x

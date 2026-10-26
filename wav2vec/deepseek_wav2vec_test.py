@@ -165,7 +165,7 @@ def finetune_wav2vec2(num_classes, output_dir="wav2vec2_finetuned"):
             num_labels=num_classes,
             attention_dropout=0.1,
             hidden_dropout=0.1,
-            classifier_proj_size=256,
+            classifier_proj_size=1024,
             ignore_mismatched_sizes=True
         ) #.cpu()
     except:
@@ -220,8 +220,6 @@ def finetune_wav2vec2(num_classes, output_dir="wav2vec2_finetuned"):
         per_device_eval_batch_size=4,
         num_train_epochs=10,
         weight_decay=0.01,
-        warmup_ratio=0.1,
-        logging_dir=os.path.join(output_dir, "logs"),
         logging_steps=10,
         save_total_limit=2,
         load_best_model_at_end=True,
@@ -250,7 +248,6 @@ def finetune_wav2vec2(num_classes, output_dir="wav2vec2_finetuned"):
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         compute_metrics=compute_metrics,
-        tokenizer=processor.feature_extractor,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
     )
 
