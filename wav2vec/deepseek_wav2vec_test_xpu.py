@@ -190,7 +190,7 @@ def finetune_wav2vec2(num_classes, output_dir="wav2vec2_finetuned"):
             "facebook/wav2vec2-base",
             num_labels=num_classes,
             use_weighted_layer_sum=True,
-            classifier_proj_size=256,
+            classifier_proj_size=512,
             layerdrop=0.0,
             mask_time_prob=0.0,
             hidden_dropout=0.1,
