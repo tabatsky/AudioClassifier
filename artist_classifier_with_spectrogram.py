@@ -12,6 +12,8 @@ from sklearn.metrics import classification_report, f1_score
 
 from scipy import signal
 
+from tqdm import tqdm
+
 from artist_net import ArtistNetSpectrogramV20, sample_len
 from debug import _print
 
@@ -19,7 +21,8 @@ version_name = 'spectrogram_v20'
 
 artist_count = 3
 
-samples_per_file = 600
+samples_per_file = 1000
+# samples_per_file = 600
 # samples_per_file = 400
 # samples_per_file = 300
 
@@ -52,7 +55,8 @@ lr = 3e-4
 lr_gamma = 0.9
 # the_batch_size = 100
 # the_batch_size = 200
-the_batch_size = 600
+# the_batch_size = 600
+the_batch_size = 1000
 
 sample_rate = 8000
 
@@ -113,7 +117,7 @@ _print(artist_data_train)
 _print(artist_data_train.shape)
 
 artist_data_train_spectrograms = []
-for i in range(count_train):
+for i in tqdm(range(count_train)):
     sample = artist_data_train[i, :]
     frequencies, times, spectrogram = signal.spectrogram(sample, sample_rate)
     artist_data_train_spectrograms.append(spectrogram)
@@ -132,7 +136,7 @@ _print(artist_data_validate)
 _print(artist_data_validate.shape)
 
 artist_data_validate_spectrograms = []
-for i in range(count_validate):
+for i in tqdm(range(count_validate)):
     sample = artist_data_validate[i, :]
     frequencies, times, spectrogram = signal.spectrogram(sample, sample_rate)
     artist_data_validate_spectrograms.append(spectrogram)
@@ -273,7 +277,7 @@ while epoch < end_epoch:
 
     artist_net.train()
 
-    for start_index in range(0, len(X_train), the_batch_size):
+    for start_index in tqdm(range(0, len(X_train), the_batch_size)):
         optimizer.zero_grad()
 
         batch_indexes = order[start_index:start_index+the_batch_size]
@@ -302,8 +306,8 @@ while epoch < end_epoch:
             order = np.random.permutation(len(X_validate))
             # accuracy = 0.0
             all_preds, all_labels = [], []
-            for i in range(6):
-                validate_batch_indexes = order[900 * i:900 * (i + 1)]
+            for i in tqdm(range(samples_per_file * files_per_artist_validate * artist_count // the_batch_size)):
+                validate_batch_indexes = order[the_batch_size * i:the_batch_size * (i + 1)]
                 x_validate_batch = X_validate[validate_batch_indexes].to(device)
                 y_validate_batch = y_validate[validate_batch_indexes].to(device)
                 # test_preds = artist_net.inference(x_validate_batch).to(device)
