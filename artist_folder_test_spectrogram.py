@@ -65,7 +65,7 @@ artist_net = ArtistNetSpectrogramV2()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
-    artist_net.load_state_dict(torch.load(fn_weights))
+    artist_net.load_state_dict(torch.load(fn_weights, map_location='cpu'))
     artist_net.eval()
 
 artist_net = artist_net.to(device)
