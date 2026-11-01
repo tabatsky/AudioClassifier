@@ -7,7 +7,7 @@ version_name = 'artist_v6'
 artist_count = 3
 
 lr = 3e-3
-ktan = 0.3
+ktan = 0.03
 
 sample_len = 24000
 
