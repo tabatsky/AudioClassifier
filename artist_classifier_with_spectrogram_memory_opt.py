@@ -9,10 +9,12 @@ from scipy import signal
 from sklearn.metrics import classification_report, f1_score
 from tqdm import tqdm
 
-from artist_net import ArtistNetSpectrogramV2, sample_len
+# from artist_net import ArtistNetSpectrogramV2, sample_len
+from artist_net import ArtistResNet, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v2'
+# version_name = 'spectrogram_v2'
+version_name = 'ResNet'
 
 artist_count = 3
 samples_per_file = 1000
@@ -36,7 +38,8 @@ accuracy_log = f'{working_dir}/accuracy/{version_name}_{artist_count}_{samples_p
 
 lr = 3e-4
 lr_gamma = 0.9
-the_batch_size = 400
+# the_batch_size = 400
+the_batch_size = 200
 sample_rate = 8000
 
 last_epoch = -1
@@ -127,7 +130,8 @@ print(X_validate.min().item(), X_validate.max().item(), X_validate.mean().item()
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV2()
+# artist_net = ArtistNetSpectrogramV2()
+artist_net = ArtistResNet()
 
 epoch = last_epoch
 if epoch >= 0:

@@ -14,10 +14,12 @@ from scipy import signal
 
 from tqdm import tqdm
 
-from artist_net import ArtistNetSpectrogramV2, sample_len
+# from artist_net import ArtistNetSpectrogramV2, sample_len
+from artist_net import ArtistResNet, sample_len
 from debug import _print
 
-version_name = 'spectrogram_v2'
+# version_name = 'spectrogram_v2'
+version_name = 'ResNet'
 
 artist_count = 3
 
@@ -196,7 +198,8 @@ print(X_validate.cpu().min(), X_validate.cpu().max(), X_validate.cpu().mean())
 print('making tensors done')
 
 print('preparing neural networking')
-artist_net = ArtistNetSpectrogramV2()
+# artist_net = ArtistNetSpectrogramV2()
+artist_net = ArtistResNet()
 
 epoch = last_epoch
 

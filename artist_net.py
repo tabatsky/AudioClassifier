@@ -1,4 +1,6 @@
 import torch
+import torchvision
+from torchvision.models import resnet18, ResNet18_Weights
 
 from debug import _print
 
@@ -3359,3 +3361,46 @@ class ArtistNetSpectrogramV20(torch.nn.Module):
         x = self.forward(x)
         x = self.sm(x)
         return x
+
+
+class ArtistResNet(torch.nn.Module):
+    def __init__(self, N=artist_count, W=129, H=107, arch_weights=ResNet18_Weights.IMAGENET1K_V1,
+                 keep_resolution=True):
+        super().__init__()
+        self.W, self.H, self.N = W, H, N
+
+        net = resnet18(weights=arch_weights)
+
+        # 1) 3 канала -> 1 канал: суммируем предобученные веса по входным каналам
+        old = net.conv1
+        new = torch.nn.Conv2d(1, old.out_channels, old.kernel_size,
+                              stride=old.stride, padding=old.padding, bias=False)
+        with torch.no_grad():
+            new.weight.copy_(old.weight.sum(dim=1, keepdim=True))
+        net.conv1 = new
+
+        # 2) Спектрограмма маленькая (129x107), ResNet уменьшает в 32 раза -> 5x4.
+        #    Чтобы не терять разрешение, ослабляем начальный даунсэмплинг.
+        if keep_resolution:
+            net.conv1.stride = (1, 1)   # веса остаются те же, меняется только шаг
+            net.maxpool = torch.nn.Identity()
+
+        # 3) Новая голова
+        net.fc = torch.nn.Linear(net.fc.in_features, N)
+
+        for p in net.parameters():
+            p.requires_grad = False
+        for p in net.fc.parameters():
+            p.requires_grad = True
+        for p in net.conv1.parameters():
+            p.requires_grad = True
+
+        self.net = net
+        self.sm = torch.nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x = x.reshape(x.shape[0], 1, self.W, self.H)
+        return self.net(x)
+
+    def inference(self, x):
+        return self.sm(self.forward(x))
