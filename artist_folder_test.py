@@ -15,18 +15,18 @@ from artist_net import make_actual_nn, version_name
 from debug import _print
 
 working_dir = '.'
+suffix = '3_1000_24'
 
-# weights_dir = f'{working_dir}/{version_name}_3_400_16_weights'
-weights_dir = f'{working_dir}/weights/{version_name}_3_300_24_weights'
+weights_dir = f'{working_dir}/weights/{version_name}_{suffix}_weights'
 
 FRAME_RATE = 8000
 CHUNK_SIZE = 24000
 
-last_epoch = 70
+last_epoch = 1
 
 S = 24000
 N = 3
-L = 500
+L = 250
 
 ktan = 0.03
 
@@ -55,7 +55,9 @@ artist_net = make_actual_nn()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
-    artist_net.load_state_dict(torch.load(fn_weights))
+    ckpt = torch.load(fn_weights, map_location='cpu')
+    state = ckpt['model'] if 'model' in ckpt else ckpt
+    artist_net.load_state_dict(state)
     artist_net.eval()
 
 artist_net = artist_net.to(device)
@@ -152,6 +154,6 @@ else:
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig("confusion_matrix_folder_test.png", dpi=150)
+    plt.savefig(f"confusion_matrix_folder_test_{version_name}_{suffix}.png", dpi=150)
     plt.close()
 

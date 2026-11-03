@@ -4,7 +4,8 @@ from torchvision.models import resnet18, ResNet18_Weights
 
 from debug import _print
 
-version_name = 'artist_v6'
+# version_name = 'artist_v6'
+version_name = 'PANNs_v2'
 
 artist_count = 3
 
@@ -33,6 +34,8 @@ def make_actual_nn():
         return ArtistNetV5()
     elif version_name == 'artist_v6':
         return ArtistNetV6()
+    elif version_name == 'PANNs_v2':
+        return ArtistPANNsV2()
     else:
         return None
 
@@ -3437,6 +3440,211 @@ class ArtistResNetV2(torch.nn.Module):
     def forward(self, x):
         x = x.reshape(x.shape[0], 1, self.W, self.H)
         return self.net(x)
+
+    def inference(self, x):
+        return self.sm(self.forward(x))
+
+
+class ConvBlock(nn.Module):
+    def __init__(self, cin, cout):
+        super().__init__()
+        self.conv1 = nn.Conv2d(cin, cout, 3, 1, 1, bias=False)
+        self.conv2 = nn.Conv2d(cout, cout, 3, 1, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(cout)
+        self.bn2 = nn.BatchNorm2d(cout)
+
+    def forward(self, x, pool=(2, 2)):
+        x = F.relu_(self.bn1(self.conv1(x)))
+        x = F.relu_(self.bn2(self.conv2(x)))
+        return F.avg_pool2d(x, pool) if pool != (1, 1) else x
+
+
+def spec_augment(x, t_width=16, t_n=2, f_width=8, f_n=2):
+    """x: (B, 1, T, F). Маскирует случайные полосы по времени и частоте."""
+    B, _, T, Fq = x.shape
+    dev = x.device
+    for n, width, size, dim in [(t_n, t_width, T, 2), (f_n, f_width, Fq, 3)]:
+        idx = torch.arange(size, device=dev)[None]
+        for _ in range(n):
+            w = torch.randint(0, width + 1, (B,), device=dev)
+            s = (torch.rand(B, device=dev) * (size - w)).long()
+            m = (idx >= s[:, None]) & (idx < (s + w)[:, None])
+            m = m[:, None, :, None] if dim == 2 else m[:, None, None, :]
+            x = x.masked_fill(m, 0.0)
+    return x
+
+
+class ArtistPANNs(nn.Module):
+    """
+    input_type='waveform': вход (B, samples) при 32 кГц, как у оригинальных PANNs.
+    input_type='spec'    : вход (B, n_freq, n_time) или плоский (B, n_freq*n_time).
+    """
+    def __init__(self, N=artist_count, input_type='spec', ckpt='Cnn14_mAP=0.431.pth',
+                 n_freq=129, n_time=107, apply_log=True, freeze_bn=False):
+        super().__init__()
+        self.input_type = input_type
+        self.n_freq, self.n_time = n_freq, n_time
+        self.apply_log = apply_log
+        self.freeze_bn = freeze_bn
+
+        if input_type == 'waveform':
+            from torchlibrosa.stft import Spectrogram, LogmelFilterBank
+            self.spectrogram_extractor = Spectrogram(
+                n_fft=1024, hop_length=320, win_length=1024, window='hann',
+                center=True, pad_mode='reflect', freeze_parameters=True)
+            self.logmel_extractor = LogmelFilterBank(
+                sr=32000, n_fft=1024, n_mels=64, fmin=50, fmax=14000,
+                ref=1.0, amin=1e-10, top_db=None, freeze_parameters=True)
+            n_bins = 64
+        else:
+            n_bins = n_freq
+
+        self.bn0 = nn.BatchNorm2d(n_bins)
+        chans = [1, 64, 128, 256, 512, 1024, 2048]
+        self.blocks = nn.ModuleList(ConvBlock(a, b) for a, b in zip(chans[:-1], chans[1:]))
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc_out = nn.Linear(2048, N)   # новая голова
+        self.sm = nn.Softmax(dim=1)
+
+        if ckpt is not None:
+            self._load_pretrained(ckpt, load_bn0=(input_type == 'waveform'))
+
+    def _load_pretrained(self, path, load_bn0):
+        sd = torch.load(path, map_location='cpu')['model']
+        new = {}
+        for k, v in sd.items():
+            if k.startswith('conv_block'):
+                i = int(k.split('.')[0][len('conv_block'):]) - 1
+                new[f"blocks.{i}.{k.split('.', 1)[1]}"] = v
+            elif k.startswith('fc1.'):
+                new[k] = v
+            elif k.startswith('bn0.') and load_bn0:
+                new[k] = v
+        missing, unexpected = self.load_state_dict(new, strict=False)
+        print('not loaded (ожидаемо: fc_out, bn0 в режиме spec):', missing)
+
+    def train(self, mode=True):
+        super().train(mode)
+        if mode and self.freeze_bn:
+            for m in self.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    m.eval()
+        return self
+
+    def _front(self, x):
+        if self.input_type == 'waveform':
+            x = self.spectrogram_extractor(x)     # (B, 1, T, 513)
+            x = self.logmel_extractor(x)          # (B, 1, T, 64) лог-мел
+        else:
+            B = x.shape[0]
+            x = x.reshape(B, self.n_freq, self.n_time)
+            if self.apply_log:                    # поставьте False, если уже лог-масштаб
+                x = torch.log1p(x)
+            x = x.transpose(1, 2).unsqueeze(1)    # (B, 1, T, F)
+        x = self.bn0(x.transpose(1, 3)).transpose(1, 3)   # нормализация по частотам
+        return x
+
+    def forward(self, x):
+        x = self._front(x)
+        if self.training:
+            x = spec_augment(x)
+        for i, blk in enumerate(self.blocks):
+            x = blk(x, pool=(2, 2) if i < 5 else (1, 1))
+            x = F.dropout(x, p=0.2, training=self.training)
+        x = x.mean(dim=3)                         # усреднение по частоте
+        x = x.max(dim=2)[0] + x.mean(dim=2)       # max + mean по времени
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = F.relu_(self.fc1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        return self.fc_out(x)                     # логиты
+
+    def inference(self, x):
+        return self.sm(self.forward(x))
+
+
+class ArtistPANNsV2(nn.Module):
+    """
+    input_type='waveform': вход (B, samples) при 32 кГц, как у оригинальных PANNs.
+    input_type='spec'    : вход (B, n_freq, n_time) или плоский (B, n_freq*n_time).
+    """
+    def __init__(self, N=artist_count, input_type='waveform', ckpt='Cnn14_mAP=0.431.pth',
+                 n_freq=129, n_time=107, apply_log=True, freeze_bn=False):
+        super().__init__()
+        self.input_type = input_type
+        self.n_freq, self.n_time = n_freq, n_time
+        self.apply_log = apply_log
+        self.freeze_bn = freeze_bn
+
+        if input_type == 'waveform':
+            from torchlibrosa.stft import Spectrogram, LogmelFilterBank
+            self.spectrogram_extractor = Spectrogram(
+                n_fft=1024, hop_length=320, win_length=1024, window='hann',
+                center=True, pad_mode='reflect', freeze_parameters=True)
+            self.logmel_extractor = LogmelFilterBank(
+                sr=32000, n_fft=1024, n_mels=64, fmin=50, fmax=14000,
+                ref=1.0, amin=1e-10, top_db=None, freeze_parameters=True)
+            n_bins = 64
+        else:
+            n_bins = n_freq
+
+        self.bn0 = nn.BatchNorm2d(n_bins)
+        chans = [1, 64, 128, 256, 512, 1024, 2048]
+        self.blocks = nn.ModuleList(ConvBlock(a, b) for a, b in zip(chans[:-1], chans[1:]))
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc_out = nn.Linear(2048, N)   # новая голова
+        self.sm = nn.Softmax(dim=1)
+
+        if ckpt is not None:
+            self._load_pretrained(ckpt, load_bn0=(input_type == 'waveform'))
+
+    def _load_pretrained(self, path, load_bn0):
+        sd = torch.load(path, map_location='cpu')['model']
+        new = {}
+        for k, v in sd.items():
+            if k.startswith('conv_block'):
+                i = int(k.split('.')[0][len('conv_block'):]) - 1
+                new[f"blocks.{i}.{k.split('.', 1)[1]}"] = v
+            elif k.startswith('fc1.'):
+                new[k] = v
+            elif k.startswith('bn0.') and load_bn0:
+                new[k] = v
+        missing, unexpected = self.load_state_dict(new, strict=False)
+        print('not loaded (ожидаемо: fc_out, bn0 в режиме spec):', missing)
+
+    def train(self, mode=True):
+        super().train(mode)
+        if mode and self.freeze_bn:
+            for m in self.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    m.eval()
+        return self
+
+    def _front(self, x):
+        if self.input_type == 'waveform':
+            x = self.spectrogram_extractor(x)     # (B, 1, T, 513)
+            x = self.logmel_extractor(x)          # (B, 1, T, 64) лог-мел
+        else:
+            B = x.shape[0]
+            x = x.reshape(B, self.n_freq, self.n_time)
+            if self.apply_log:                    # поставьте False, если уже лог-масштаб
+                x = torch.log1p(x)
+            x = x.transpose(1, 2).unsqueeze(1)    # (B, 1, T, F)
+        x = self.bn0(x.transpose(1, 3)).transpose(1, 3)   # нормализация по частотам
+        return x
+
+    def forward(self, x):
+        x = self._front(x)
+        if self.training:
+            x = spec_augment(x)
+        for i, blk in enumerate(self.blocks):
+            x = blk(x, pool=(2, 2) if i < 5 else (1, 1))
+            x = F.dropout(x, p=0.2, training=self.training)
+        x = x.mean(dim=3)                         # усреднение по частоте
+        x = x.max(dim=2)[0] + x.mean(dim=2)       # max + mean по времени
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = F.relu_(self.fc1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
+        return self.fc_out(x)                     # логиты
 
     def inference(self, x):
         return self.sm(self.forward(x))

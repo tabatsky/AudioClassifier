@@ -15,11 +15,13 @@ from pydub import AudioSegment
 from scipy import signal
 
 # from artist_net import ArtistNetSpectrogramV2
-from artist_net import ArtistResNetV2
+# from artist_net import ArtistResNetV2
+from artist_net import ArtistPANNs
 from debug import _print
 
 # version_name = 'spectrogram_v2'
-version_name = 'ResNet_v2'
+# version_name = 'ResNet_v2'
+version_name = 'PANNs'
 
 working_dir = '.'
 
@@ -64,7 +66,8 @@ torch.backends.cudnn.deterministic = True
 
 print('preparing neural networking')
 # artist_net = ArtistNetSpectrogramV2()
-artist_net = ArtistResNetV2()
+# artist_net = ArtistResNetV2()
+artist_net = ArtistPANNs()
 
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'

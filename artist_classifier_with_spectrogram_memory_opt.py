@@ -10,11 +10,13 @@ from sklearn.metrics import classification_report, f1_score
 from tqdm import tqdm
 
 # from artist_net import ArtistNetSpectrogramV2, sample_len
-from artist_net import ArtistResNetV2, sample_len
+# from artist_net import ArtistResNetV2, sample_len
+from artist_net import ArtistPANNs, sample_len
 from debug import _print
 
 # version_name = 'spectrogram_v2'
-version_name = 'ResNet_v2'
+# version_name = 'ResNet_v2'
+version_name = 'PANNs'
 
 artist_count = 3
 samples_per_file = 1000
@@ -131,7 +133,8 @@ print('making tensors done')
 
 print('preparing neural networking')
 # artist_net = ArtistNetSpectrogramV2()
-artist_net = ArtistResNetV2()
+# artist_net = ArtistResNetV2()
+artist_net = ArtistPANNs()
 
 epoch = last_epoch
 if epoch >= 0:
