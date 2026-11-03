@@ -235,6 +235,7 @@ for epoch in epoch_bar:
             'val_acc': va['acc'],
             'val_loss': va['loss'],
         })
+        torch.save(model.state_dict(), f'{weights_dir}/model_weights_epoch_{epoch}.pth')
     else:
         epochs_without_improvement += 1
 
@@ -243,8 +244,6 @@ for epoch in epoch_bar:
         f.write(f"{epoch};{tr['loss']};{tr['acc']};{tr['p_true']};"
                 f"{va['loss']};{va['acc']};{va['p_true']};{va['f1']};{lr_now};{sec:.1f}\n")
 
-    print(f'tr_loss={tr['loss']:.4f}, val_loss={va['loss']:.4f},\
-                          val_acc={va['acc']:.4f}, best={best_acc:.4f}@{best_epoch}')
     tqdm.write(f"epoch {epoch:3d} | train loss {tr['loss']:.4f} acc {tr['acc']:.4f} | "
                f"val loss {va['loss']:.4f} acc {va['acc']:.4f} f1 {va['f1']:.4f} | "
                f"lr {lr_now:.2e} | {sec:.1f}s{'  * saved' if improved else ''}")

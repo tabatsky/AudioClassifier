@@ -56,7 +56,8 @@ artist_net = make_actual_nn()
 if last_epoch >= 0:
     fn_weights = f'{weights_dir}/model_weights_epoch_{last_epoch}.pth'
     ckpt = torch.load(fn_weights, map_location='cpu')
-    state = ckpt['model'] if 'model' in ckpt else ckpt
+    # state = ckpt['model'] if 'model' in ckpt else ckpt
+    state = ckpt
     artist_net.load_state_dict(state)
     artist_net.eval()
 
